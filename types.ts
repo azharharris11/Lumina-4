@@ -303,7 +303,7 @@ export interface SitePage {
     gallery: SiteGalleryItem[];
     sections: SiteSection[];
     seo?: SiteSEO; 
-    hidden?: boolean; // New: Hide from navigation
+    hidden?: boolean; // Hide from navigation menu
 }
 
 export interface SitePixels {
@@ -319,7 +319,7 @@ export interface SiteConfig {
     headline: string;
     description: string;
     theme: SiteTheme;
-    style?: SiteStyle; // New: Global styles
+    style?: SiteStyle; // Global style configuration
     heroImage: string;
     showPricing: boolean;
     showTeam: boolean;
