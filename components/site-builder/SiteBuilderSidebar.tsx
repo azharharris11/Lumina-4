@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion, Reorder } from 'framer-motion';
-import { Layout, Layers, Image as ImageIcon, Megaphone, File, Plus, Palette, Check, Save, ArrowLeft, Trash2, GripVertical, Home, PanelLeftClose, ChevronUp, ChevronDown, Search, Link2, Settings } from 'lucide-react';
+import { Layout, Layers, Image as ImageIcon, Megaphone, File, Plus, Palette, Check, Save, ArrowLeft, Trash2, GripVertical, Home, PanelLeftClose, ChevronUp, ChevronDown, Search, Link2, Settings, Eye, EyeOff } from 'lucide-react';
 import { SiteConfig, SectionType, SiteTheme, SitePage, SiteSection } from '../../types';
 import SiteSectionEditor, { DebouncedInput, DebouncedTextarea, ImageUploader } from './SiteSectionEditor';
 
@@ -10,8 +10,8 @@ interface SiteBuilderSidebarProps {
     setIsSidebarOpen: (isOpen: boolean) => void;
     isMobile: boolean;
     localSite: SiteConfig;
-    activeTab: 'CONTENT' | 'SECTIONS' | 'GALLERY' | 'MARKETING' | 'PAGES';
-    setActiveTab: (tab: 'CONTENT' | 'SECTIONS' | 'GALLERY' | 'MARKETING' | 'PAGES') => void;
+    activeTab: 'CONTENT' | 'SECTIONS' | 'GALLERY' | 'MARKETING' | 'PAGES' | 'STYLES';
+    setActiveTab: (tab: 'CONTENT' | 'SECTIONS' | 'GALLERY' | 'MARKETING' | 'PAGES' | 'STYLES') => void;
     activePageId: string;
     setActivePageId: (id: string) => void;
     activePageData: SiteConfig | SitePage;
@@ -31,6 +31,7 @@ interface SiteBuilderSidebarProps {
     setSelectedSectionId: (id: string | null) => void;
     handleAddPage: () => void;
     handleDeletePage: (id: string) => void;
+    handleHidePage: (id: string, hidden: boolean) => void;
     newPageName: string;
     setNewPageName: (name: string) => void;
     newGalleryUrl: string;
@@ -41,14 +42,32 @@ interface SiteBuilderSidebarProps {
     onRedo: () => void;
 }
 
+const FONTS = [
+    { label: 'Syne (Display)', value: 'Syne, sans-serif' },
+    { label: 'Outfit (Clean)', value: 'Outfit, sans-serif' },
+    { label: 'Playfair (Serif)', value: 'Playfair Display, serif' },
+    { label: 'Inter (Modern)', value: 'Inter, sans-serif' },
+    { label: 'Lora (Reading)', value: 'Lora, serif' }
+];
+
 const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = (props) => {
     const {
         isSidebarOpen, setIsSidebarOpen, isMobile, localSite, activeTab, setActiveTab, activePageId, setActivePageId, activePageData, hasChanges,
         themes, onExit, onSave, handleGlobalChange, handleContentChange, handleAddSection, handleUpdateSection, handleDeleteSection, handleReorderSections,
-        getActiveSections, selectedSectionId, setSelectedSectionId, handleAddPage, handleDeletePage, newPageName, setNewPageName, newGalleryUrl, setNewGalleryUrl
+        getActiveSections, selectedSectionId, setSelectedSectionId, handleAddPage, handleDeletePage, handleHidePage, newPageName, setNewPageName, newGalleryUrl, setNewGalleryUrl
     } = props;
 
     const sections = getActiveSections();
+
+    // Initialize style defaults if missing
+    const siteStyle = localSite.style || {
+        primaryColor: '#000000',
+        secondaryColor: '#ffffff',
+        backgroundColor: '#ffffff',
+        textColor: '#000000',
+        fontHeading: 'Syne, sans-serif',
+        fontBody: 'Outfit, sans-serif'
+    };
 
     // Helper for Social Links update
     const updateSocialLink = (platform: string, url: string) => {
@@ -67,6 +86,10 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = (props) => {
     };
 
     const getSocialLink = (platform: string) => localSite.socialLinks?.find(l => l.platform === platform)?.url || '';
+
+    const handleStyleChange = (key: string, value: string) => {
+        handleGlobalChange('style', { ...siteStyle, [key]: value });
+    };
 
     return (
         <motion.div 
@@ -128,10 +151,11 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = (props) => {
                                     <button 
                                         key={page.id}
                                         onClick={() => { setActivePageId(page.id); setActiveTab('SECTIONS'); }}
-                                        className={`px-3 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap transition-colors
+                                        className={`px-3 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap transition-colors flex items-center gap-1
                                             ${activePageId === page.id ? 'bg-lumina-highlight text-white border border-lumina-highlight' : 'text-lumina-muted hover:text-white'}
                                         `}
                                     >
+                                        {page.hidden && <EyeOff size={10} className="text-lumina-muted"/>}
                                         {page.title}
                                     </button>
                                 ))}
@@ -142,8 +166,9 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = (props) => {
                         {/* Tabs */}
                         <div className="flex border-b border-lumina-highlight overflow-x-auto no-scrollbar shrink-0">
                             {[
-                                { id: 'CONTENT', icon: Layout, label: 'Design' },
+                                { id: 'CONTENT', icon: Layout, label: 'Content' },
                                 { id: 'SECTIONS', icon: Layers, label: 'Blocks' },
+                                { id: 'STYLES', icon: Palette, label: 'Styles' },
                                 { id: 'GALLERY', icon: ImageIcon, label: 'Gallery' },
                                 { id: 'MARKETING', icon: Settings, label: 'Settings' },
                                 { id: 'PAGES', icon: File, label: 'Pages' }
@@ -165,11 +190,70 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = (props) => {
 
                         {/* Tab Content */}
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6 bg-lumina-surface/50 pb-12 md:pb-4">
-                            {activeTab === 'CONTENT' && (
+                            
+                            {activeTab === 'STYLES' && (
                                 <div className="space-y-6">
-                                    {/* Improved Theme Selector */}
-                                    <div className="space-y-3">
-                                        <h3 className="text-xs font-bold text-lumina-muted uppercase tracking-widest flex items-center gap-2"><Palette size={14}/> Theme Selection</h3>
+                                    {/* Global Style Controls */}
+                                    <div className="space-y-4">
+                                        <h3 className="text-xs font-bold text-lumina-muted uppercase tracking-widest flex items-center gap-2">Global Colors</h3>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-[10px] font-bold text-lumina-muted mb-1 block">Background</label>
+                                                <div className="flex gap-2">
+                                                    <input type="color" value={siteStyle.backgroundColor} onChange={e => handleStyleChange('backgroundColor', e.target.value)} className="w-8 h-8 rounded cursor-pointer border-none p-0"/>
+                                                    <input value={siteStyle.backgroundColor} onChange={e => handleStyleChange('backgroundColor', e.target.value)} className="flex-1 bg-lumina-base border border-lumina-highlight rounded px-2 text-xs text-white uppercase"/>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-lumina-muted mb-1 block">Text</label>
+                                                <div className="flex gap-2">
+                                                    <input type="color" value={siteStyle.textColor} onChange={e => handleStyleChange('textColor', e.target.value)} className="w-8 h-8 rounded cursor-pointer border-none p-0"/>
+                                                    <input value={siteStyle.textColor} onChange={e => handleStyleChange('textColor', e.target.value)} className="flex-1 bg-lumina-base border border-lumina-highlight rounded px-2 text-xs text-white uppercase"/>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-lumina-muted mb-1 block">Primary Accent</label>
+                                                <div className="flex gap-2">
+                                                    <input type="color" value={siteStyle.primaryColor} onChange={e => handleStyleChange('primaryColor', e.target.value)} className="w-8 h-8 rounded cursor-pointer border-none p-0"/>
+                                                    <input value={siteStyle.primaryColor} onChange={e => handleStyleChange('primaryColor', e.target.value)} className="flex-1 bg-lumina-base border border-lumina-highlight rounded px-2 text-xs text-white uppercase"/>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-lumina-muted mb-1 block">Secondary</label>
+                                                <div className="flex gap-2">
+                                                    <input type="color" value={siteStyle.secondaryColor} onChange={e => handleStyleChange('secondaryColor', e.target.value)} className="w-8 h-8 rounded cursor-pointer border-none p-0"/>
+                                                    <input value={siteStyle.secondaryColor} onChange={e => handleStyleChange('secondaryColor', e.target.value)} className="flex-1 bg-lumina-base border border-lumina-highlight rounded px-2 text-xs text-white uppercase"/>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-4 border-t border-lumina-highlight pt-6">
+                                        <h3 className="text-xs font-bold text-lumina-muted uppercase tracking-widest">Typography</h3>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-lumina-muted mb-1 block">Headings</label>
+                                            <select 
+                                                value={siteStyle.fontHeading} 
+                                                onChange={e => handleStyleChange('fontHeading', e.target.value)}
+                                                className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-2 text-xs text-white focus:border-lumina-accent outline-none"
+                                            >
+                                                {FONTS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-lumina-muted mb-1 block">Body Text</label>
+                                            <select 
+                                                value={siteStyle.fontBody} 
+                                                onChange={e => handleStyleChange('fontBody', e.target.value)}
+                                                className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-2 text-xs text-white focus:border-lumina-accent outline-none"
+                                            >
+                                                {FONTS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-3 border-t border-lumina-highlight pt-6">
+                                        <h3 className="text-xs font-bold text-lumina-muted uppercase tracking-widest flex items-center gap-2">Layout Templates</h3>
                                         <div className="grid grid-cols-2 gap-3">
                                             {themes.map((theme) => (
                                                 <button
@@ -188,8 +272,12 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = (props) => {
                                             ))}
                                         </div>
                                     </div>
+                                </div>
+                            )}
 
-                                    <div className="space-y-4 border-t border-lumina-highlight pt-6">
+                            {activeTab === 'CONTENT' && (
+                                <div className="space-y-6">
+                                    <div className="space-y-4">
                                         <h3 className="text-xs font-bold text-lumina-muted uppercase tracking-widest flex items-center gap-2"><Layout size={14}/> {activePageId === 'HOME' ? 'Global Content' : 'Page Content'}</h3>
                                         
                                         <div>
@@ -349,8 +437,19 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = (props) => {
                                     <div className="space-y-2">
                                         {localSite.pages?.map(page => (
                                             <div key={page.id} className="flex items-center justify-between p-3 bg-lumina-base border border-lumina-highlight rounded-xl group">
-                                                <div><p className="text-xs font-bold text-white">{page.title}</p><p className="text-[10px] text-lumina-muted font-mono">/{page.slug}</p></div>
-                                                <div className="flex gap-2"><button onClick={() => handleDeletePage(page.id)} className="p-1.5 hover:text-rose-500 text-lumina-muted"><Trash2 size={14}/></button></div>
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className={`text-xs font-bold ${page.hidden ? 'text-lumina-muted line-through' : 'text-white'}`}>{page.title}</p>
+                                                        {page.hidden && <EyeOff size={10} className="text-lumina-muted"/>}
+                                                    </div>
+                                                    <p className="text-[10px] text-lumina-muted font-mono">/{page.slug}</p>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => handleHidePage(page.id, !page.hidden)} className="p-1.5 hover:text-white text-lumina-muted transition-colors" title={page.hidden ? "Show in Nav" : "Hide from Nav"}>
+                                                        {page.hidden ? <EyeOff size={14}/> : <Eye size={14}/>}
+                                                    </button>
+                                                    <button onClick={() => handleDeletePage(page.id)} className="p-1.5 hover:text-rose-500 text-lumina-muted transition-colors"><Trash2 size={14}/></button>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>

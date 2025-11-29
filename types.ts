@@ -281,6 +281,15 @@ export interface SiteSEO {
     keywords: string[];
 }
 
+export interface SiteStyle {
+    primaryColor: string;
+    secondaryColor: string;
+    backgroundColor: string;
+    textColor: string;
+    fontHeading: string;
+    fontBody: string;
+}
+
 export interface SitePage {
     id: string;
     title: string;
@@ -294,6 +303,7 @@ export interface SitePage {
     gallery: SiteGalleryItem[];
     sections: SiteSection[];
     seo?: SiteSEO; 
+    hidden?: boolean; // New: Hide from navigation
 }
 
 export interface SitePixels {
@@ -309,6 +319,7 @@ export interface SiteConfig {
     headline: string;
     description: string;
     theme: SiteTheme;
+    style?: SiteStyle; // New: Global styles
     heroImage: string;
     showPricing: boolean;
     showTeam: boolean;

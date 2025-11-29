@@ -1,31 +1,42 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { SiteConfig } from '../../types';
 
 interface SitePreviewFrameProps {
   children: React.ReactNode;
   className?: string;
+  siteConfig: SiteConfig; // Added to inject vars
 }
 
-const SitePreviewFrame: React.FC<SitePreviewFrameProps> = ({ children, className }) => {
+const SitePreviewFrame: React.FC<SitePreviewFrameProps> = ({ children, className, siteConfig }) => {
   const [contentRef, setContentRef] = useState<HTMLIFrameElement | null>(null);
   const mountNode = contentRef?.contentWindow?.document?.body;
   const isInitialized = useRef(false);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     if (!contentRef?.contentWindow || isInitialized.current) return;
 
     const doc = contentRef.contentWindow.document;
     
-    // Only inject if not already present to prevent FOUC on re-renders
+    // Only inject if not already present
     if (!doc.getElementById('site-preview-styles')) {
-        // 1. Clear existing head (if any)
-        doc.head.innerHTML = '';
+        // 1. Initial Hide to prevent FOUC
+        doc.body.style.opacity = '0';
+        doc.body.style.transition = 'opacity 0.3s ease';
 
         // 2. Inject Tailwind CDN
         const tailwindScript = doc.createElement('script');
         tailwindScript.id = 'site-preview-tailwind';
         tailwindScript.src = "https://cdn.tailwindcss.com";
+        tailwindScript.onload = () => {
+            // Unhide after Tailwind loads
+            setTimeout(() => {
+                doc.body.style.opacity = '1';
+                setIsLoaded(true);
+            }, 100);
+        };
         doc.head.appendChild(tailwindScript);
 
         // 3. Inject Google Fonts
@@ -42,14 +53,14 @@ const SitePreviewFrame: React.FC<SitePreviewFrameProps> = ({ children, className
 
         const fontLink = doc.createElement('link');
         fontLink.rel = 'stylesheet';
-        fontLink.href = 'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Syne:wght@400;600;700;800&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap';
+        fontLink.href = 'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Syne:wght@400;600;700;800&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;600&family=Lora:ital,wght@0,400;1,400&display=swap';
         doc.head.appendChild(fontLink);
 
-        // 4. Basic Reset for Iframe Context
+        // 4. Basic Reset & Variables Container
         const style = doc.createElement('style');
         style.id = 'site-preview-styles';
         style.innerHTML = `
-          body { margin: 0; overflow-x: hidden; background-color: #fff; }
+          body { margin: 0; overflow-x: hidden; background-color: var(--site-bg, #fff); color: var(--site-text, #000); }
           * { box-sizing: border-box; }
           ::-webkit-scrollbar { width: 6px; }
           ::-webkit-scrollbar-track { background: #1c1917; }
@@ -59,8 +70,31 @@ const SitePreviewFrame: React.FC<SitePreviewFrameProps> = ({ children, className
         
         isInitialized.current = true;
     }
-
   }, [contentRef]);
+
+  // Inject CSS Variables for Global Styles
+  useEffect(() => {
+      if (!contentRef?.contentWindow) return;
+      const doc = contentRef.contentWindow.document;
+      const root = doc.documentElement;
+      
+      const style = siteConfig.style || {
+          primaryColor: '#000000',
+          secondaryColor: '#ffffff',
+          backgroundColor: '#ffffff',
+          textColor: '#000000',
+          fontHeading: 'Syne, sans-serif',
+          fontBody: 'Outfit, sans-serif'
+      };
+
+      root.style.setProperty('--site-primary', style.primaryColor);
+      root.style.setProperty('--site-secondary', style.secondaryColor);
+      root.style.setProperty('--site-bg', style.backgroundColor);
+      root.style.setProperty('--site-text', style.textColor);
+      root.style.setProperty('--site-font-heading', style.fontHeading);
+      root.style.setProperty('--site-font-body', style.fontBody);
+
+  }, [contentRef, siteConfig.style]);
 
   return (
     <iframe

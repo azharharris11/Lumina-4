@@ -46,7 +46,7 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
   const localSite = history[historyIndex];
 
   const [previewMode, setPreviewMode] = useState<'DESKTOP' | 'MOBILE'>('DESKTOP');
-  const [activeTab, setActiveTab] = useState<'CONTENT' | 'SECTIONS' | 'GALLERY' | 'MARKETING' | 'PAGES'>('CONTENT');
+  const [activeTab, setActiveTab] = useState<'CONTENT' | 'SECTIONS' | 'GALLERY' | 'MARKETING' | 'PAGES' | 'STYLES'>('CONTENT');
   const [activePageId, setActivePageId] = useState<string>('HOME');
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [newPageName, setNewPageName] = useState('');
@@ -211,6 +211,13 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
       }
   };
 
+  const handleHidePage = (id: string, hidden: boolean) => {
+      updateSiteState({
+          ...localSite,
+          pages: (localSite.pages || []).map(p => p.id === id ? { ...p, hidden } : p)
+      });
+  };
+
   // Helper to decide theme component
   const renderTheme = () => {
       const props = {
@@ -260,13 +267,14 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
             handleAddSection={handleAddSection}
             handleUpdateSection={handleUpdateSection}
             handleDeleteSection={handleDeleteSection}
-            handleMoveSection={() => {}} // Implemented via drag/drop reorder instead
+            handleMoveSection={() => {}} 
             handleReorderSections={handleReorderSections}
             getActiveSections={getActiveSections}
             selectedSectionId={selectedSectionId}
             setSelectedSectionId={setSelectedSectionId}
             handleAddPage={handleAddPage}
             handleDeletePage={handleDeletePage}
+            handleHidePage={handleHidePage}
             newPageName={newPageName}
             setNewPageName={setNewPageName}
             newGalleryUrl={newGalleryUrl}
@@ -302,11 +310,26 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
             <div className="flex-1 overflow-hidden relative flex items-center justify-center bg-[#0a0a0a] p-8">
                 <motion.div 
                     layout
-                    className={`bg-white shadow-2xl transition-all duration-500 overflow-hidden relative ${previewMode === 'MOBILE' ? 'w-[375px] h-[750px] rounded-[3rem] border-8 border-[#333]' : 'w-full h-full rounded-lg'}`}
+                    className={`bg-white shadow-2xl transition-all duration-500 overflow-hidden relative border-black
+                        ${previewMode === 'MOBILE' 
+                            ? 'w-[375px] h-[750px] rounded-[3rem] border-[12px] shadow-[0_0_0_2px_#333]' 
+                            : 'w-full h-full rounded-lg border-0'
+                        }
+                    `}
                 >
-                    {previewMode === 'MOBILE' && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-[#333] rounded-b-xl z-50"></div>}
+                    {/* Mobile Bezel & Notch */}
+                    {previewMode === 'MOBILE' && (
+                        <>
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-7 bg-black rounded-b-xl z-50 flex justify-center items-center">
+                                <div className="w-16 h-1.5 bg-gray-800 rounded-full"></div>
+                            </div>
+                            <div className="absolute right-[-14px] top-24 w-[3px] h-12 bg-gray-700 rounded-r-md"></div>
+                            <div className="absolute left-[-14px] top-24 w-[3px] h-8 bg-gray-700 rounded-l-md"></div>
+                            <div className="absolute left-[-14px] top-36 w-[3px] h-12 bg-gray-700 rounded-l-md"></div>
+                        </>
+                    )}
                     
-                    <SitePreviewFrame className="w-full h-full bg-white">
+                    <SitePreviewFrame className="w-full h-full bg-white" siteConfig={localSite}>
                         {renderTheme()}
                     </SitePreviewFrame>
                 </motion.div>
