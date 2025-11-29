@@ -43,17 +43,38 @@ const ProjectProofing: React.FC<ProjectProofingProps> = ({ booking, googleToken,
       }
   }, [booking.id]);
 
+  // Robust Folder ID Extractor
+  const getFolderIdFromUrl = (url?: string) => {
+      if (!url) return null;
+      // Try /folders/ format
+      const matchFolders = url.match(/\/folders\/([a-zA-Z0-9-_]+)/);
+      if (matchFolders) return matchFolders[1];
+      // Try id= format
+      const matchId = url.match(/[?&]id=([a-zA-Z0-9-_]+)/);
+      if (matchId) return matchId[1];
+      // Try /open?id= format
+      const matchOpen = url.match(/\/open\?id=([a-zA-Z0-9-_]+)/);
+      if (matchOpen) return matchOpen[1];
+      
+      return null;
+  };
+
   const fetchProofingFiles = async () => {
       if (!googleToken || !booking?.deliveryUrl) return;
-      const match = booking.deliveryUrl.match(/\/folders\/([a-zA-Z0-9-_]+)/);
-      const folderId = match ? match[1] : null;
-      if (!folderId) return;
+      const folderId = getFolderIdFromUrl(booking.deliveryUrl);
+      
+      if (!folderId) {
+          console.error("Could not extract Folder ID from URL:", booking.deliveryUrl);
+          return;
+      }
       
       setIsLoadingProofing(true);
       setAuthError(false);
       try {
           const query = `'${folderId}' in parents and mimeType contains 'image/' and trashed=false`;
+          // Request specific fields including thumbnailLink
           const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,thumbnailLink,webViewLink,mimeType)&orderBy=createdTime desc&pageSize=1000`;
+          
           const res = await fetch(url, { headers: { 'Authorization': `Bearer ${googleToken}` } });
           
           if (res.status === 401) {
@@ -61,8 +82,16 @@ const ProjectProofing: React.FC<ProjectProofingProps> = ({ booking, googleToken,
               return;
           }
 
-          if (res.ok) { const data = await res.json(); setProofingFiles(data.files || []); }
-      } catch (e) { console.error(e); } finally { setIsLoadingProofing(false); }
+          if (res.ok) { 
+              const data = await res.json(); 
+              // console.log("Drive API Response:", data); // Debugging
+              setProofingFiles(data.files || []); 
+          }
+      } catch (e) { 
+          console.error("Drive API Error:", e); 
+      } finally { 
+          setIsLoadingProofing(false); 
+      }
   };
 
   const handleSyncToPortal = async () => {
@@ -73,8 +102,9 @@ const ProjectProofing: React.FC<ProjectProofingProps> = ({ booking, googleToken,
           
           const newProofingData: ProofingItem[] = proofingFiles.map(file => ({
               id: file.id,
-              url: file.thumbnailLink.replace('=s220', '=s800'),
-              thumbnail: file.thumbnailLink,
+              // Use slightly larger thumbnail but handle broken links
+              url: file.thumbnailLink ? file.thumbnailLink.replace('=s220', '=s1200') : '', 
+              thumbnail: file.thumbnailLink || '',
               filename: file.name,
               selected: currentSelectionsMap.get(file.id) || false,
               feedback: ''
@@ -83,7 +113,7 @@ const ProjectProofing: React.FC<ProjectProofingProps> = ({ booking, googleToken,
           await updateDoc(doc(db, "bookings", booking.id), {
               proofingData: newProofingData
           });
-          alert(`Synced ${newProofingData.length} photos to Client Portal.`);
+          alert(`Synced ${newProofingData.length} photos to Client Portal.\n\nIMPORTANT: Ensure the Google Drive folder is set to "Anyone with the link can view" so clients can see the images.`);
       } catch (e) {
           console.error("Sync failed", e);
           alert("Failed to sync. Please try again.");
@@ -185,8 +215,11 @@ const ProjectProofing: React.FC<ProjectProofingProps> = ({ booking, googleToken,
             </div>
         ) : proofingFiles.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-lumina-highlight rounded-xl bg-lumina-base/20">
-                <p className="text-sm text-lumina-muted">Folder is empty.</p>
-                <p className="text-xs text-lumina-muted/50 mt-2">Upload images to the linked folder to see them here.</p>
+                <p className="text-sm text-lumina-muted font-bold">No images found.</p>
+                <p className="text-xs text-lumina-muted/50 mt-2 text-center max-w-md">
+                    Check if the folder contains images directly (not in subfolders).<br/>
+                    Also ensure you have permissions to view the files.
+                </p>
             </div>
         ) : (
             <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
@@ -201,7 +234,13 @@ const ProjectProofing: React.FC<ProjectProofingProps> = ({ booking, googleToken,
                         const isSelected = liveProofingData.find(p => p.id === file.id)?.selected;
                         return (
                             <div key={file.id} className={`aspect-square rounded-lg overflow-hidden relative group cursor-pointer border-2 transition-all ${isSelected ? 'border-rose-500 shadow-lg shadow-rose-500/10' : 'border-transparent hover:border-lumina-highlight'}`}>
-                                <img src={file.thumbnailLink.replace('=s220', '=s400')} className="w-full h-full object-cover" loading="lazy" />
+                                <img 
+                                    src={file.thumbnailLink?.replace('=s220', '=s400')} 
+                                    className="w-full h-full object-cover" 
+                                    loading="lazy" 
+                                    referrerPolicy="no-referrer"
+                                    alt={file.name}
+                                />
                                 
                                 {isSelected && (
                                     <div className="absolute top-2 right-2 bg-rose-500 text-white p-1 rounded-full shadow-sm z-10">

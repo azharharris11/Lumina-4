@@ -259,7 +259,12 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking, config }) => {
                             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2 md:gap-4">
                                 {proofingData.map((photo) => (
                                     <div key={photo.id} className="relative aspect-square group bg-neutral-800 rounded-lg overflow-hidden">
-                                        <img src={photo.thumbnail} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+                                        <img 
+                                            src={photo.thumbnail} 
+                                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
+                                            loading="lazy" 
+                                            referrerPolicy="no-referrer"
+                                        />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
                                             <p className="text-[10px] text-white/70 truncate mb-1 font-mono">{photo.filename}</p>
                                         </div>
@@ -306,7 +311,11 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking, config }) => {
                             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                                 {selectedPhotos.map((photo) => (
                                     <div key={photo.id} className="relative aspect-square rounded-lg overflow-hidden border-2 border-emerald-500/50">
-                                        <img src={photo.thumbnail} className="w-full h-full object-cover" />
+                                        <img 
+                                            src={photo.thumbnail} 
+                                            className="w-full h-full object-cover" 
+                                            referrerPolicy="no-referrer"
+                                        />
                                         {!booking.selectionSubmitted && (
                                             <button 
                                                 onClick={() => handleToggleHeart(photo.id)}
