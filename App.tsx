@@ -172,7 +172,26 @@ const App: React.FC = () => {
           case 'inventory': return <InventoryView assets={assets} users={usersList} onAddAsset={addAsset} onUpdateAsset={updateAsset} onDeleteAsset={deleteAsset} config={config} />;
           case 'clients': return <ClientsView clients={clients} bookings={bookings} onAddClient={addClient} onUpdateClient={updateClient} onDeleteClient={deleteClient} onSelectBooking={(id) => { setSelectedBookingId(id); setIsProjectDrawerOpen(true); }} config={config} />;
           case 'team': return <TeamView users={usersList} bookings={bookings} onAddUser={async (u) => { await setDoc(doc(db, "users", u.id), u); }} onUpdateUser={async (u) => { await setDoc(doc(db, "users", u.id), u); }} onDeleteUser={async (id) => { await deleteDoc(doc(db, "users", id)); }} onRecordExpense={addTransaction} />;
-          case 'finance': return <FinanceView accounts={accounts} metrics={metrics} bookings={bookings} users={usersList} transactions={transactions} onTransfer={transferFunds} onRecordExpense={addTransaction} onSettleBooking={settleBooking} onDeleteTransaction={deleteTransaction} config={config} onAddAccount={async (a) => { await setDoc(doc(db, "accounts", a.id), a); }} onUpdateAccount={async (a) => { await setDoc(doc(db, "accounts", a.id), a); }} />;
+          case 'finance': return <FinanceView 
+              accounts={accounts} 
+              metrics={metrics} 
+              bookings={bookings} 
+              users={usersList} 
+              transactions={transactions} 
+              onTransfer={transferFunds} 
+              onRecordExpense={addTransaction} 
+              onSettleBooking={settleBooking} 
+              onDeleteTransaction={deleteTransaction} 
+              config={config} 
+              onAddAccount={async (a) => { 
+                  // Fix: Inject ownerId to satisfy Firestore rules
+                  await setDoc(doc(db, "accounts", a.id), { ...a, ownerId: currentUser.id }); 
+              }} 
+              onUpdateAccount={async (a) => { 
+                  // Fix: Ensure ownerId persists on update
+                  await setDoc(doc(db, "accounts", a.id), { ...a, ownerId: currentUser.id }, { merge: true }); 
+              }} 
+          />;
           case 'analytics': return <AnalyticsView bookings={bookings} packages={packages} transactions={transactions} users={users} />;
           case 'settings': return <SettingsView packages={packages} config={config} onAddPackage={async (p) => { await setDoc(doc(db, "packages", p.id), { ...p, ownerId: currentUser.id }); }} onUpdatePackage={async (p) => { await setDoc(doc(db, "packages", p.id), p); }} onDeletePackage={async (id) => { await deleteDoc(doc(db, "packages", id)); }} onUpdateConfig={updateConfig} currentUser={currentUser} onUpdateUserProfile={async (u) => { await setDoc(doc(db, "users", u.id), u); setCurrentUser(u); }} onDeleteAccount={async () => { }} googleToken={googleToken} setGoogleToken={handleSetGoogleToken} assets={assets} />;
           default: return <DashboardView user={currentUser} bookings={bookings} transactions={transactions} onSelectBooking={(id) => { setSelectedBookingId(id); setIsProjectDrawerOpen(true); }} selectedDate={new Date().toISOString().split('T')[0]} onNavigate={setCurrentView} config={config} />;
