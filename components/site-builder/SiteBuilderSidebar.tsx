@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { motion, Reorder } from 'framer-motion';
-import { Layout, Layers, Image as ImageIcon, Megaphone, File, Plus, Palette, Check, Save, ArrowLeft, Trash2, GripVertical, Home, PanelLeftClose, ChevronUp, ChevronDown, Search, Link2 } from 'lucide-react';
+import { Layout, Layers, Image as ImageIcon, Megaphone, File, Plus, Palette, Check, Save, ArrowLeft, Trash2, GripVertical, Home, PanelLeftClose, ChevronUp, ChevronDown, Search, Link2, Settings } from 'lucide-react';
 import { SiteConfig, SectionType, SiteTheme, SitePage, SiteSection } from '../../types';
 import SiteSectionEditor, { DebouncedInput, DebouncedTextarea, ImageUploader } from './SiteSectionEditor';
 
@@ -54,13 +54,16 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = (props) => {
     const updateSocialLink = (platform: string, url: string) => {
         const current = localSite.socialLinks || [];
         const exists = current.find(l => l.platform === platform);
+        let newLinks;
+        
         if (url.trim() === '') {
-            handleGlobalChange('socialLinks', current.filter(l => l.platform !== platform));
+            newLinks = current.filter(l => l.platform !== platform);
         } else if (exists) {
-            handleGlobalChange('socialLinks', current.map(l => l.platform === platform ? { ...l, url } : l));
+            newLinks = current.map(l => l.platform === platform ? { ...l, url } : l);
         } else {
-            handleGlobalChange('socialLinks', [...current, { platform, url }]);
+            newLinks = [...current, { platform, url }];
         }
+        handleGlobalChange('socialLinks', newLinks);
     };
 
     const getSocialLink = (platform: string) => localSite.socialLinks?.find(l => l.platform === platform)?.url || '';
@@ -142,7 +145,7 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = (props) => {
                                 { id: 'CONTENT', icon: Layout, label: 'Design' },
                                 { id: 'SECTIONS', icon: Layers, label: 'Blocks' },
                                 { id: 'GALLERY', icon: ImageIcon, label: 'Gallery' },
-                                { id: 'MARKETING', icon: Megaphone, label: 'Settings' },
+                                { id: 'MARKETING', icon: Settings, label: 'Settings' },
                                 { id: 'PAGES', icon: File, label: 'Pages' }
                             ].map((tab) => (
                                 <button 
@@ -164,6 +167,7 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = (props) => {
                         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6 bg-lumina-surface/50 pb-12 md:pb-4">
                             {activeTab === 'CONTENT' && (
                                 <div className="space-y-6">
+                                    {/* Improved Theme Selector */}
                                     <div className="space-y-3">
                                         <h3 className="text-xs font-bold text-lumina-muted uppercase tracking-widest flex items-center gap-2"><Palette size={14}/> Theme Selection</h3>
                                         <div className="grid grid-cols-2 gap-3">
@@ -171,17 +175,20 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = (props) => {
                                                 <button
                                                     key={theme.id}
                                                     onClick={() => handleGlobalChange('theme', theme.id)}
-                                                    className={`group relative flex flex-col gap-2 p-3 rounded-xl border transition-all text-left ${localSite.theme === theme.id ? 'border-lumina-accent bg-lumina-accent/10 shadow-lg' : 'border-lumina-highlight hover:border-white/50 bg-lumina-base'}`}
+                                                    className={`group relative flex flex-col overflow-hidden rounded-xl border transition-all text-left h-24
+                                                        ${localSite.theme === theme.id ? 'border-lumina-accent ring-1 ring-lumina-accent shadow-lg' : 'border-lumina-highlight hover:border-white/50'}
+                                                    `}
                                                 >
-                                                    <div className="flex justify-between w-full">
-                                                        <span className="text-xs font-bold text-white block">{theme.label}</span>
-                                                        {localSite.theme === theme.id && <Check size={14} className="text-lumina-accent" />}
+                                                    <div className="absolute inset-0" style={{ backgroundColor: theme.color }}></div>
+                                                    <div className="absolute bottom-0 left-0 w-full p-2 bg-black/60 backdrop-blur-sm flex justify-between items-center">
+                                                        <span className="text-[10px] font-bold text-white uppercase tracking-wider">{theme.label}</span>
+                                                        {localSite.theme === theme.id && <div className="w-4 h-4 bg-lumina-accent rounded-full flex items-center justify-center"><Check size={10} className="text-black"/></div>}
                                                     </div>
-                                                    <div className="w-full h-12 rounded-lg shadow-inner border border-black/10 shrink-0" style={{ backgroundColor: theme.color }}></div>
                                                 </button>
                                             ))}
                                         </div>
                                     </div>
+
                                     <div className="space-y-4 border-t border-lumina-highlight pt-6">
                                         <h3 className="text-xs font-bold text-lumina-muted uppercase tracking-widest flex items-center gap-2"><Layout size={14}/> {activePageId === 'HOME' ? 'Global Content' : 'Page Content'}</h3>
                                         

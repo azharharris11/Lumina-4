@@ -1,16 +1,28 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SiteSection, SectionType } from '../../types';
-import { Trash2, Video, MapPin, MousePointerClick, Upload, Loader2, Image as ImageIcon } from 'lucide-react';
+import { Trash2, Video, MousePointerClick, Upload, Loader2, Image as ImageIcon } from 'lucide-react';
 import { uploadFile } from '../../utils/storageUtils';
 
-// Helper Components (Local Definition)
+// Helper Components
 export const DebouncedInput = ({ value, onChange, className, placeholder, type = 'text', ...props }: any) => {
     const [localValue, setLocalValue] = useState(value);
-    useEffect(() => setLocalValue(value), [value]);
+    
+    // Sync local state when prop changes (external update)
+    useEffect(() => {
+        setLocalValue(value);
+    }, [value]);
     
     const handleBlur = () => {
-        if (localValue !== value) onChange(localValue);
+        if (localValue !== value) {
+            onChange(localValue);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            e.currentTarget.blur();
+        }
     };
 
     return (
@@ -19,6 +31,7 @@ export const DebouncedInput = ({ value, onChange, className, placeholder, type =
             value={localValue}
             onChange={e => setLocalValue(e.target.value)}
             onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
             className={className}
             placeholder={placeholder}
             {...props}
@@ -28,10 +41,15 @@ export const DebouncedInput = ({ value, onChange, className, placeholder, type =
 
 export const DebouncedTextarea = ({ value, onChange, className, placeholder, ...props }: any) => {
     const [localValue, setLocalValue] = useState(value);
-    useEffect(() => setLocalValue(value), [value]);
+    
+    useEffect(() => {
+        setLocalValue(value);
+    }, [value]);
     
     const handleBlur = () => {
-        if (localValue !== value) onChange(localValue);
+        if (localValue !== value) {
+            onChange(localValue);
+        }
     };
 
     return (
@@ -76,8 +94,11 @@ export const ImageUploader = ({ value, onChange, className }: any) => {
                 <input type="file" className="hidden" accept="image/*" onChange={handleUpload} disabled={isUploading} />
             </label>
             {value && (
-                <div className="w-9 h-9 rounded overflow-hidden border border-lumina-highlight shrink-0 bg-black">
+                <div className="w-9 h-9 rounded overflow-hidden border border-lumina-highlight shrink-0 bg-black relative group">
                     <img src={value} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <ImageIcon size={12} className="text-white"/>
+                    </div>
                 </div>
             )}
         </div>
