@@ -89,7 +89,7 @@ const LandingPageView: React.FC<LandingPageViewProps> = ({ onLogin, onRegister }
           >
               <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent z-20 h-full"></div>
               <img 
-                src="https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=2574&auto=format&fit=crop" 
+                src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=2070&auto=format&fit=crop" 
                 alt="Dashboard Interface" 
                 className="rounded-xl border border-white/10 shadow-2xl opacity-80"
               />

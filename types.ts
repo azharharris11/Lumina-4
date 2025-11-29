@@ -504,6 +504,7 @@ export interface AnalyticsViewProps {
   bookings: Booking[];
   packages: Package[];
   transactions: Transaction[];
+  users: User[];
 }
 
 export interface SettingsViewProps {

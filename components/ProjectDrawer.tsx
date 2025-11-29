@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Booking, ProjectStatus, ActivityLog } from '../types';
-import { X, FileSignature, Upload, Trash2, MessageCircle, ListChecks, History, Eye, Copy, MapPin, Tag, Calendar, ArrowLeft, AlertCircle } from 'lucide-react';
+import { X, FileSignature, Upload, Trash2, MessageCircle, ListChecks, History, Eye, Copy, MapPin, Tag, Calendar, ArrowLeft, AlertCircle, DollarSign } from 'lucide-react';
 import { useStudio } from '../contexts/StudioContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -13,6 +13,9 @@ import ProjectFiles from './project-drawer-tabs/ProjectFiles';
 import ProjectProofing from './project-drawer-tabs/ProjectProofing';
 import ProjectLogs from './project-drawer-tabs/ProjectLogs';
 import ProjectDrivePicker from './project-drawer-tabs/ProjectDrivePicker';
+import ProjectFinance from './project-drawer-tabs/ProjectFinance';
+import SettleModal from './finance/modals/SettleModal';
+import InvoiceModal from './InvoiceModal';
 
 interface ProjectDrawerProps {
   isOpen: boolean;
@@ -23,18 +26,23 @@ interface ProjectDrawerProps {
   googleToken?: string | null;
 }
 
-type Tab = 'OVERVIEW' | 'TASKS' | 'TIMELINE' | 'LOGS' | 'PROOFING' | 'CONTRACT';
+type Tab = 'OVERVIEW' | 'TASKS' | 'FINANCE' | 'TIMELINE' | 'LOGS' | 'PROOFING' | 'CONTRACT';
 
 const Motion = motion as any;
 
 const ProjectDrawer: React.FC<ProjectDrawerProps> = ({ isOpen, onClose, booking, onUpdateBooking, onDeleteBooking, googleToken }) => {
   // Context Usage to replace Prop Drilling
-  const { config, users, accounts, addTransaction } = useStudio();
+  const { config, users, accounts, addTransaction, transactions, settleBooking } = useStudio();
   const { currentUser } = useAuth();
 
   const [activeTab, setActiveTab] = useState<Tab>('OVERVIEW');
   const [showDrivePicker, setShowDrivePicker] = useState(false);
   const [showRefundPrompt, setShowRefundPrompt] = useState(false);
+  
+  // Finance Modal States
+  const [showSettleModal, setShowSettleModal] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [settleMode, setSettleMode] = useState<'PAYMENT'|'REFUND'>('PAYMENT');
 
   // Derived State
   const photographer = users.find(u => u.id === booking?.photographerId);
@@ -123,6 +131,16 @@ const ProjectDrawer: React.FC<ProjectDrawerProps> = ({ isOpen, onClose, booking,
       alert("Link Copied!"); 
   };
 
+  // Helper for SettleModal Max Amount
+  const calculateBalanceDue = (b: Booking) => {
+      const tax = b.taxSnapshot !== undefined ? b.taxSnapshot : (config.taxRate || 0);
+      const sub = b.items?.reduce((s, i) => s + i.total, 0) || b.price;
+      let disc = 0;
+      if (b.discount) disc = b.discount.type === 'PERCENT' ? sub * (b.discount.value / 100) : b.discount.value;
+      const total = (sub - disc) * (1 + tax / 100);
+      return Math.max(0, total - b.paidAmount);
+  };
+
   if (!isOpen || !booking) return null;
 
   return (
@@ -200,6 +218,7 @@ const ProjectDrawer: React.FC<ProjectDrawerProps> = ({ isOpen, onClose, booking,
         <div className="bg-lumina-surface border-b border-lumina-highlight px-4 lg:px-6 py-3 flex gap-3 overflow-x-auto no-scrollbar shrink-0">
             {[
                 { id: 'OVERVIEW', icon: ListChecks, label: 'Overview' },
+                { id: 'FINANCE', icon: DollarSign, label: 'Finance' },
                 { id: 'TASKS', icon: ListChecks, label: 'Tasks' },
                 { id: 'TIMELINE', icon: Upload, label: 'Files' },
                 { id: 'PROOFING', icon: Eye, label: 'Proofing' },
@@ -227,6 +246,16 @@ const ProjectDrawer: React.FC<ProjectDrawerProps> = ({ isOpen, onClose, booking,
                     photographer={photographer} 
                     onUpdateBooking={onUpdateBooking} 
                     createLocalLog={createLocalLog}
+                />
+            )}
+
+            {activeTab === 'FINANCE' && (
+                <ProjectFinance 
+                    booking={booking}
+                    transactions={transactions}
+                    onSettle={(mode) => { setSettleMode(mode); setShowSettleModal(true); }}
+                    onViewInvoice={() => setShowInvoiceModal(true)}
+                    config={config}
                 />
             )}
 
@@ -271,6 +300,27 @@ const ProjectDrawer: React.FC<ProjectDrawerProps> = ({ isOpen, onClose, booking,
                     />
                 )}
             </AnimatePresence>
+
+            {/* FINANCE MODALS */}
+            <SettleModal 
+                isOpen={showSettleModal}
+                bookingId={booking.id}
+                mode={settleMode}
+                currentPaid={booking.paidAmount}
+                maxAmount={calculateBalanceDue(booking)}
+                accounts={accounts}
+                onClose={() => setShowSettleModal(false)}
+                onConfirm={(amount, accId) => {
+                    settleBooking(booking.id, settleMode === 'REFUND' ? -amount : amount, accId);
+                    setShowSettleModal(false);
+                }}
+            />
+            <InvoiceModal 
+                isOpen={showInvoiceModal}
+                onClose={() => setShowInvoiceModal(false)}
+                booking={booking}
+                config={config}
+            />
 
         </div>
 

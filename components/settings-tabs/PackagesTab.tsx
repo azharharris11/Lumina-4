@@ -47,6 +47,7 @@ const PackagesTab: React.FC<PackagesTabProps> = ({ packages, onAddPackage, onUpd
                 costBreakdown: [],
                 defaultTasks: ['Cull Photos', 'Color Grade', 'Retouch', 'Export', 'Upload Gallery'],
                 defaultAssetIds: [],
+                defaultAssetIds: [],
                 depositOverride: { type: 'PERCENTAGE', value: 50 }, // Default 50%
                 taxIncluded: false
             });
@@ -150,7 +151,7 @@ const PackagesTab: React.FC<PackagesTabProps> = ({ packages, onAddPackage, onUpd
 
             {/* PACKAGE LIST GRID */}
             <div className="space-y-8">
-                {Object.entries(groupedPackages).map(([category, pkgs]) => (
+                {Object.entries(groupedPackages).map(([category, pkgs]: [string, Package[]]) => (
                     <div key={category}>
                         <h3 className="text-sm font-bold text-lumina-muted uppercase tracking-wider mb-3 pl-1 border-l-2 border-lumina-accent/50">{category}</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -274,7 +275,7 @@ const PackagesTab: React.FC<PackagesTabProps> = ({ packages, onAddPackage, onUpd
                                                 <button onClick={addFeature} className="bg-lumina-highlight px-4 rounded-lg text-white font-bold">+</button>
                                             </div>
                                             <div className="flex flex-wrap gap-2">
-                                                {(pkgForm.features || []).map((f, i) => (
+                                                {((pkgForm.features as string[]) || []).map((f, i) => (
                                                     <span key={i} className="bg-lumina-surface border border-lumina-highlight px-3 py-1 rounded-lg text-sm text-white flex items-center gap-2">
                                                         {f} <button onClick={() => removeFeature(i)}><X size={12} className="text-lumina-muted hover:text-white"/></button>
                                                     </span>
@@ -339,7 +340,7 @@ const PackagesTab: React.FC<PackagesTabProps> = ({ packages, onAddPackage, onUpd
                                             </div>
 
                                             <div className="space-y-1">
-                                                {(pkgForm.costBreakdown || []).map(cost => (
+                                                {((pkgForm.costBreakdown as PackageCostItem[]) || []).map(cost => (
                                                     <div key={cost.id} className="flex justify-between items-center bg-lumina-surface px-3 py-2 rounded-lg border border-lumina-highlight text-xs">
                                                         <span className="text-white font-bold">{cost.description}</span>
                                                         <div className="flex items-center gap-3">
@@ -352,7 +353,7 @@ const PackagesTab: React.FC<PackagesTabProps> = ({ packages, onAddPackage, onUpd
                                                 <div className="flex justify-between items-center px-3 py-2 mt-2 border-t border-lumina-highlight">
                                                     <span className="text-xs font-bold text-lumina-muted uppercase">Total Cost</span>
                                                     <span className="text-sm font-bold text-rose-400 font-mono">
-                                                        Rp {(pkgForm.costBreakdown || []).reduce((sum, c) => sum + c.amount, 0).toLocaleString()}
+                                                        Rp {((pkgForm.costBreakdown as PackageCostItem[]) || []).reduce((sum, c) => sum + c.amount, 0).toLocaleString()}
                                                     </span>
                                                 </div>
                                             </div>
@@ -378,7 +379,7 @@ const PackagesTab: React.FC<PackagesTabProps> = ({ packages, onAddPackage, onUpd
                                             </div>
                                             
                                             <div className="space-y-2">
-                                                {(pkgForm.defaultTasks || []).map((task, i) => (
+                                                {((pkgForm.defaultTasks as string[]) || []).map((task, i) => (
                                                     <div key={i} className="flex justify-between items-center bg-lumina-surface px-4 py-2 rounded-lg border border-lumina-highlight group">
                                                         <span className="text-sm text-white">{task}</span>
                                                         <button onClick={() => removeTask(i)} className="text-lumina-muted hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><X size={14}/></button>
@@ -396,7 +397,7 @@ const PackagesTab: React.FC<PackagesTabProps> = ({ packages, onAddPackage, onUpd
                                                     <button 
                                                         key={asset.id}
                                                         onClick={() => toggleAsset(asset.id)}
-                                                        className={`px-3 py-1.5 text-xs border rounded-lg transition-all ${(pkgForm.defaultAssetIds || []).includes(asset.id) ? 'bg-lumina-accent text-lumina-base border-lumina-accent font-bold' : 'text-lumina-muted border-lumina-highlight hover:border-white'}`}
+                                                        className={`px-3 py-1.5 text-xs border rounded-lg transition-all ${((pkgForm.defaultAssetIds as string[]) || []).includes(asset.id) ? 'bg-lumina-accent text-lumina-base border-lumina-accent font-bold' : 'text-lumina-muted border-lumina-highlight hover:border-white'}`}
                                                     >
                                                         {asset.name}
                                                     </button>

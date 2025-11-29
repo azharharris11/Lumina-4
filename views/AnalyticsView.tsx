@@ -5,7 +5,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Booking, Package, Transaction, User, AnalyticsViewProps } from '../types';
 import { TrendingUp, Clock, Target, CalendarCheck, DollarSign, TrendingDown, FileText, Printer, ArrowRight, Users, Briefcase, Percent } from 'lucide-react';
 
-const AnalyticsView: React.FC<AnalyticsViewProps> = ({ bookings, packages, transactions = [] }) => {
+const AnalyticsView: React.FC<AnalyticsViewProps> = ({ bookings, packages, transactions = [], users = [] }) => {
   const [viewMode, setViewMode] = useState<'DASHBOARD' | 'SHAREHOLDER'>('DASHBOARD');
   const [timeRange, setTimeRange] = useState<'MONTH' | 'QUARTER' | 'YEAR'>('MONTH');
 
@@ -151,7 +151,9 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ bookings, packages, trans
   const staffPerformance = useMemo(() => {
       const staffMap = new Map<string, number>();
       filteredData.bookings.forEach(b => {
-          staffMap.set(b.photographerId, (staffMap.get(b.photographerId) || 0) + b.price);
+          if (b.photographerId) {
+              staffMap.set(b.photographerId, (staffMap.get(b.photographerId) || 0) + b.price);
+          }
       });
       return Array.from(staffMap.entries()).map(([id, rev]) => ({
           id,
@@ -407,15 +409,20 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ bookings, packages, trans
                            <Users size={18} className="text-blue-400"/> Top Revenue Generators
                        </h3>
                        <div className="space-y-4">
-                           {staffPerformance.slice(0, 5).map((staff, index) => (
+                           {staffPerformance.slice(0, 5).map((staff, index) => {
+                               const userProfile = users.find(u => u.id === staff.id);
+                               const displayName = userProfile ? userProfile.name : staff.id;
+                               const displayAvatar = userProfile ? userProfile.avatar : `https://ui-avatars.com/api/?name=${staff.id}&background=random`;
+
+                               return (
                                <div key={staff.id} className="flex items-center justify-between">
                                    <div className="flex items-center gap-3">
                                        <div className="w-6 h-6 rounded-full bg-lumina-highlight flex items-center justify-center text-xs font-bold text-white print:bg-gray-200 print:text-black">
                                            {index + 1}
                                        </div>
-                                       <span className="text-sm text-white print:text-black">
-                                           <img src={`https://ui-avatars.com/api/?name=${staff.id}&background=random`} className="w-5 h-5 rounded-full inline mr-2 align-middle"/>
-                                           {staff.id}
+                                       <span className="text-sm text-white print:text-black flex items-center">
+                                           <img src={displayAvatar} className="w-5 h-5 rounded-full inline mr-2 object-cover border border-lumina-highlight" />
+                                           {displayName}
                                        </span>
                                    </div>
                                    <div className="text-right">
@@ -425,7 +432,8 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ bookings, packages, trans
                                        </div>
                                    </div>
                                </div>
-                           ))}
+                               );
+                           })}
                        </div>
                    </div>
 
