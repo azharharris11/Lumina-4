@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Package, Asset, PackageCostItem } from '../../types';
 import { Plus, Edit2, Archive, RefreshCcw, X, Layers, DollarSign, ListChecks, ArrowLeft, Save } from 'lucide-react';
@@ -46,7 +47,6 @@ const PackagesTab: React.FC<PackagesTabProps> = ({ packages, onAddPackage, onUpd
                 turnaroundDays: 7,
                 costBreakdown: [],
                 defaultTasks: ['Cull Photos', 'Color Grade', 'Retouch', 'Export', 'Upload Gallery'],
-                defaultAssetIds: [],
                 defaultAssetIds: [],
                 depositOverride: { type: 'PERCENTAGE', value: 50 }, // Default 50%
                 taxIncluded: false
