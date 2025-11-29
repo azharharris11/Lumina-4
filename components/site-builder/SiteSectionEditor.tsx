@@ -1,7 +1,88 @@
 
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { SiteSection, SectionType } from '../../types';
-import { Trash2, Video, MapPin, MousePointerClick } from 'lucide-react';
+import { Trash2, Video, MapPin, MousePointerClick, Upload, Loader2, Image as ImageIcon } from 'lucide-react';
+import { uploadFile } from '../../utils/storageUtils';
+
+// Helper Components (Local Definition)
+export const DebouncedInput = ({ value, onChange, className, placeholder, type = 'text', ...props }: any) => {
+    const [localValue, setLocalValue] = useState(value);
+    useEffect(() => setLocalValue(value), [value]);
+    
+    const handleBlur = () => {
+        if (localValue !== value) onChange(localValue);
+    };
+
+    return (
+        <input 
+            type={type}
+            value={localValue}
+            onChange={e => setLocalValue(e.target.value)}
+            onBlur={handleBlur}
+            className={className}
+            placeholder={placeholder}
+            {...props}
+        />
+    );
+};
+
+export const DebouncedTextarea = ({ value, onChange, className, placeholder, ...props }: any) => {
+    const [localValue, setLocalValue] = useState(value);
+    useEffect(() => setLocalValue(value), [value]);
+    
+    const handleBlur = () => {
+        if (localValue !== value) onChange(localValue);
+    };
+
+    return (
+        <textarea 
+            value={localValue}
+            onChange={e => setLocalValue(e.target.value)}
+            onBlur={handleBlur}
+            className={className}
+            placeholder={placeholder}
+            {...props}
+        />
+    );
+};
+
+export const ImageUploader = ({ value, onChange, className }: any) => {
+    const [isUploading, setIsUploading] = useState(false);
+
+    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            setIsUploading(true);
+            try {
+                const url = await uploadFile(e.target.files[0], 'site-assets');
+                onChange(url);
+            } catch (err) {
+                alert("Upload failed.");
+            } finally {
+                setIsUploading(false);
+            }
+        }
+    };
+
+    return (
+        <div className="flex gap-2 items-center">
+            <DebouncedInput 
+                value={value || ''}
+                onChange={onChange}
+                className={className}
+                placeholder="Image URL..."
+            />
+            <label className="p-2 bg-lumina-surface border border-lumina-highlight rounded-lg hover:bg-lumina-highlight cursor-pointer text-white transition-colors">
+                {isUploading ? <Loader2 size={16} className="animate-spin"/> : <Upload size={16}/>}
+                <input type="file" className="hidden" accept="image/*" onChange={handleUpload} disabled={isUploading} />
+            </label>
+            {value && (
+                <div className="w-9 h-9 rounded overflow-hidden border border-lumina-highlight shrink-0 bg-black">
+                    <img src={value} className="w-full h-full object-cover" />
+                </div>
+            )}
+        </div>
+    );
+}
 
 interface SiteSectionEditorProps {
     section: SiteSection;
@@ -20,9 +101,9 @@ const SiteSectionEditor: React.FC<SiteSectionEditorProps> = ({ section, onUpdate
             {section.type !== 'GALLERY' && section.type !== 'PRICING' && section.type !== 'TESTIMONIALS' && section.type !== 'FAQ' && section.type !== 'MAP_LOCATION' && (
                 <div>
                     <label className="text-[10px] text-lumina-muted uppercase block mb-1 font-bold">Headline</label>
-                    <input 
+                    <DebouncedInput 
                         value={section.content.headline || ''}
-                        onChange={(e) => onUpdate(section.id, { headline: e.target.value })}
+                        onChange={(val: string) => onUpdate(section.id, { headline: val })}
                         className="w-full bg-lumina-surface border border-lumina-highlight rounded-lg p-2 text-xs text-white focus:border-lumina-accent outline-none"
                     />
                 </div>
@@ -31,9 +112,9 @@ const SiteSectionEditor: React.FC<SiteSectionEditorProps> = ({ section, onUpdate
             {(section.type === 'HERO' || section.type === 'TEXT_IMAGE' || section.type === 'CTA_BANNER') && (
                 <div>
                     <label className="text-[10px] text-lumina-muted uppercase block mb-1 font-bold">Description</label>
-                    <textarea 
+                    <DebouncedTextarea 
                         value={section.content.description || ''}
-                        onChange={(e) => onUpdate(section.id, { description: e.target.value })}
+                        onChange={(val: string) => onUpdate(section.id, { description: val })}
                         className="w-full bg-lumina-surface border border-lumina-highlight rounded-lg p-2 text-xs text-white focus:border-lumina-accent outline-none min-h-[80px]"
                     />
                 </div>
@@ -41,25 +122,22 @@ const SiteSectionEditor: React.FC<SiteSectionEditorProps> = ({ section, onUpdate
             
             {(section.type === 'HERO' || section.type === 'TEXT_IMAGE') && (
                 <div>
-                    <label className="text-[10px] text-lumina-muted uppercase block mb-1 font-bold">Image URL</label>
-                    <div className="flex gap-2">
-                        <input 
-                            value={section.content.image || ''}
-                            onChange={(e) => onUpdate(section.id, { image: e.target.value })}
-                            className="w-full bg-lumina-surface border border-lumina-highlight rounded-lg p-2 text-xs text-white focus:border-lumina-accent outline-none"
-                        />
-                        {section.content.image && <img src={section.content.image} className="w-8 h-8 rounded object-cover border border-lumina-highlight" />}
-                    </div>
+                    <label className="text-[10px] text-lumina-muted uppercase block mb-1 font-bold">Image</label>
+                    <ImageUploader 
+                        value={section.content.image}
+                        onChange={(url: string) => onUpdate(section.id, { image: url })}
+                        className="w-full bg-lumina-surface border border-lumina-highlight rounded-lg p-2 text-xs text-white focus:border-lumina-accent outline-none"
+                    />
                 </div>
             )}
 
             {section.type === 'HERO' && (
                 <div>
                     <label className="text-[10px] text-lumina-muted uppercase block mb-1 font-bold flex items-center gap-1"><Video size={10}/> Video Background URL (Optional)</label>
-                    <input 
+                    <DebouncedInput 
                         placeholder="https://... (mp4/webm)"
                         value={section.content.videoUrl || ''}
-                        onChange={(e) => onUpdate(section.id, { videoUrl: e.target.value })}
+                        onChange={(val: string) => onUpdate(section.id, { videoUrl: val })}
                         className="w-full bg-lumina-surface border border-lumina-highlight rounded-lg p-2 text-xs text-white focus:border-lumina-accent outline-none"
                     />
                 </div>
@@ -97,14 +175,14 @@ const SiteSectionEditor: React.FC<SiteSectionEditorProps> = ({ section, onUpdate
                                 className="w-full bg-transparent border-none p-1 text-xs text-white font-bold placeholder-gray-600 focus:ring-0"
                                 placeholder="Title"
                             />
-                            <input 
+                            <textarea 
                                 value={item.text} 
                                 onChange={(e) => {
                                     const newItems = [...(section.content.items || [])];
                                     newItems[idx].text = e.target.value;
                                     onUpdate(section.id, { items: newItems });
                                 }}
-                                className="w-full bg-transparent border-none p-1 text-xs text-lumina-muted placeholder-gray-700 focus:ring-0"
+                                className="w-full bg-transparent border-none p-1 text-xs text-lumina-muted placeholder-gray-700 focus:ring-0 resize-none h-12"
                                 placeholder="Description"
                             />
                         </div>
@@ -122,9 +200,9 @@ const SiteSectionEditor: React.FC<SiteSectionEditorProps> = ({ section, onUpdate
                 <div className="space-y-3">
                     <div>
                         <label className="text-[10px] text-lumina-muted uppercase block mb-1 font-bold">Button Text</label>
-                        <input 
+                        <DebouncedInput 
                             value={section.content.buttonText || ''}
-                            onChange={(e) => onUpdate(section.id, { buttonText: e.target.value })}
+                            onChange={(val: string) => onUpdate(section.id, { buttonText: val })}
                             className="w-full bg-lumina-surface border border-lumina-highlight rounded-lg p-2 text-xs text-white focus:border-lumina-accent outline-none"
                         />
                     </div>
@@ -166,9 +244,9 @@ const SiteSectionEditor: React.FC<SiteSectionEditorProps> = ({ section, onUpdate
                     </div>
                     <div>
                         <label className="text-[10px] text-lumina-muted uppercase block mb-1 font-bold">Label</label>
-                        <input 
+                        <DebouncedInput 
                             value={section.content.mapConfig?.label || 'Our Studio'}
-                            onChange={(e) => onUpdate(section.id, { mapConfig: { ...section.content.mapConfig, label: e.target.value } })}
+                            onChange={(val: string) => onUpdate(section.id, { mapConfig: { ...section.content.mapConfig, label: val } })}
                             className="w-full bg-lumina-surface border border-lumina-highlight rounded-lg p-2 text-xs text-white"
                         />
                     </div>

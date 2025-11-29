@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SiteBuilderViewProps, SitePage, SiteSection, SectionType, SiteTheme, SiteConfig } from '../types';
-import { Globe, Smartphone, Monitor, PanelLeftOpen, Undo2, Redo2 } from 'lucide-react';
+import { Globe, Smartphone, Monitor, PanelLeftOpen, Undo2, Redo2, UploadCloud } from 'lucide-react';
 import SitePreviewFrame from '../components/site-builder/SitePreviewFrame';
 import SiteBuilderSidebar from '../components/site-builder/SiteBuilderSidebar';
 
@@ -55,7 +55,6 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
-  // Check if current state differs from saved config
   const hasChanges = useMemo(() => {
       return JSON.stringify(localSite) !== JSON.stringify(config.site);
   }, [localSite, config.site]);
@@ -63,11 +62,9 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
 
-  // --- HISTORY MANAGEMENT ---
   const updateSiteState = useCallback((newState: SiteConfig) => {
       const newHistory = history.slice(0, historyIndex + 1);
       newHistory.push(newState);
-      // Limit history stack size if needed (e.g. 50)
       if (newHistory.length > 50) newHistory.shift();
       setHistory(newHistory);
       setHistoryIndex(newHistory.length - 1);
@@ -81,7 +78,6 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
       if (canRedo) setHistoryIndex(prev => prev + 1);
   }, [canRedo]);
 
-  // Keyboard Shortcuts for Undo/Redo (Cmd+Z, Cmd+Shift+Z)
   useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
           if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
@@ -100,12 +96,11 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // DATA LOSS PROTECTION (Window Unload)
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
         if (hasChanges) {
             e.preventDefault();
-            e.returnValue = ''; // Chrome requires returnValue to be set
+            e.returnValue = '';
         }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -131,45 +126,51 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
   };
 
   const getActiveSections = () => {
-      if (activePageId === 'HOME') return []; 
-      return (activePageData as SitePage).sections || [];
-  };
-
-  const updateSections = (newSections: SiteSection[]) => {
-      handleContentChange('sections', newSections);
+      if (activePageId === 'HOME') return [];
+      const page = localSite.pages?.find(p => p.id === activePageId);
+      return page?.sections || [];
   };
 
   const handleAddSection = (type: SectionType) => {
       const newSection: SiteSection = {
           id: `sec-${Date.now()}`,
           type,
-          content: {
-              headline: type === 'MAP_LOCATION' ? 'Visit Us' : 'New Section',
-              description: 'Add your content here.',
-              image: 'https://images.unsplash.com/photo-1605559424843-9e4c228bf1c2?auto=format&fit=crop&w=800&q=80',
-              // New Section Defaults
-              bookingMode: type === 'CTA_BANNER' ? 'INSTANT' : undefined,
-              mapConfig: type === 'MAP_LOCATION' ? { lat: -6.2, lng: 106.8, zoom: 15, label: 'Studio Location' } : undefined
+          content: { 
+              headline: 'New Section', 
+              description: 'Edit this text.',
+              image: 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=500&q=60' 
           }
       };
-      updateSections([...getActiveSections(), newSection]);
+      const currentSections = getActiveSections();
+      updateSiteState({
+          ...localSite,
+          pages: localSite.pages?.map(p => p.id === activePageId ? { ...p, sections: [...currentSections, newSection] } : p) || []
+      });
       setSelectedSectionId(newSection.id);
   };
 
   const handleUpdateSection = (id: string, content: any) => {
-      const sections = getActiveSections().map(s => s.id === id ? { ...s, content: { ...s.content, ...content } } : s);
-      updateSections(sections);
+      const currentSections = getActiveSections();
+      const updatedSections = currentSections.map(s => s.id === id ? { ...s, content: { ...s.content, ...content } } : s);
+      updateSiteState({
+          ...localSite,
+          pages: localSite.pages?.map(p => p.id === activePageId ? { ...p, sections: updatedSections } : p) || []
+      });
   };
 
   const handleDeleteSection = (id: string) => {
-      if(window.confirm('Delete this section?')) {
-          updateSections(getActiveSections().filter(s => s.id !== id));
-          if (selectedSectionId === id) setSelectedSectionId(null);
-      }
+      const currentSections = getActiveSections();
+      updateSiteState({
+          ...localSite,
+          pages: localSite.pages?.map(p => p.id === activePageId ? { ...p, sections: currentSections.filter(s => s.id !== id) } : p) || []
+      });
   };
 
   const handleReorderSections = (newOrder: SiteSection[]) => {
-      updateSections(newOrder);
+      updateSiteState({
+          ...localSite,
+          pages: localSite.pages?.map(p => p.id === activePageId ? { ...p, sections: newOrder } : p) || []
+      });
   };
 
   const handleGlobalChange = (key: string, value: any) => {
@@ -177,154 +178,140 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
   };
 
   const handleAddPage = () => {
-      if (newPageName.trim()) {
-          const slug = newPageName.toLowerCase().replace(/\s+/g, '-');
-          const newPage: SitePage = {
-              id: `p-${Date.now()}`,
-              title: newPageName,
-              slug: slug,
-              headline: newPageName,
-              description: 'Add your page description here.',
-              heroImage: 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=800&q=80',
-              showPortfolio: true,
-              showPricing: false,
-              showBookingWidget: true,
-              gallery: [],
-              sections: [] 
-          };
-          updateSiteState({ ...localSite, pages: [...(localSite.pages || []), newPage] });
-          setNewPageName('');
-      }
+      if (!newPageName) return;
+      const newPage: SitePage = {
+          id: `page-${Date.now()}`,
+          title: newPageName,
+          slug: newPageName.toLowerCase().replace(/\s+/g, '-'),
+          headline: newPageName,
+          description: '',
+          heroImage: localSite.heroImage,
+          showPortfolio: false,
+          showPricing: false,
+          showBookingWidget: false,
+          gallery: [],
+          sections: []
+      };
+      updateSiteState({
+          ...localSite,
+          pages: [...(localSite.pages || []), newPage]
+      });
+      setNewPageName('');
+      setActivePageId(newPage.id);
+      setActiveTab('SECTIONS');
   };
 
   const handleDeletePage = (id: string) => {
-      if (window.confirm('Are you sure? This page will be deleted.')) {
-          updateSiteState({ ...localSite, pages: localSite.pages?.filter(p => p.id !== id) || [] });
+      if (confirm('Delete this page?')) {
+          updateSiteState({
+              ...localSite,
+              pages: (localSite.pages || []).filter(p => p.id !== id)
+          });
           if (activePageId === id) setActivePageId('HOME');
       }
   };
 
-  const handleSave = () => {
-      onUpdateConfig({ ...config, site: localSite });
-      // Reset history reference implicitly by parent update, 
-      // but here we keep the stack so user can undo post-save if needed
-  };
-
+  // Helper to decide theme component
   const renderTheme = () => {
-      const commonProps = { 
-          site: localSite, 
-          activePage: activePageData, 
-          packages, 
-          users, 
-          bookings, 
-          config, 
-          onBooking: onPublicBooking,
-          onNavigate: (pageId: string) => {
-              setActivePageId(pageId);
-          }
+      const props = {
+          site: localSite,
+          activePage: activePageData,
+          packages,
+          users,
+          config,
+          onBooking: onPublicBooking
       };
-
+      
       switch(localSite.theme) {
-          case 'ETHEREAL': return <EtherealTheme {...commonProps} />;
-          case 'VOGUE': return <VogueTheme {...commonProps} />;
-          case 'MINIMAL': return <MinimalTheme {...commonProps} />;
-          case 'CINEMA': return <CinemaTheme {...commonProps} />;
-          case 'RETRO': return <RetroTheme {...commonProps} />;
-          case 'ATELIER': return <AtelierTheme {...commonProps} />;
-          case 'HORIZON': return <HorizonTheme {...commonProps} />;
-          case 'BOLD': return <BoldTheme {...commonProps} />;
-          case 'IMPACT': return <ImpactTheme {...commonProps} />;
-          case 'CLEANSLATE': return <CleanSlateTheme {...commonProps} />;
-          case 'AUTHORITY': return <AuthorityTheme {...commonProps} />;
-          default: return <NoirTheme {...commonProps} />;
+          case 'ETHEREAL': return <EtherealTheme {...props} />;
+          case 'VOGUE': return <VogueTheme {...props} />;
+          case 'MINIMAL': return <MinimalTheme {...props} />;
+          case 'CINEMA': return <CinemaTheme {...props} />;
+          case 'RETRO': return <RetroTheme {...props} />;
+          case 'ATELIER': return <AtelierTheme {...props} />;
+          case 'HORIZON': return <HorizonTheme {...props} />;
+          case 'BOLD': return <BoldTheme {...props} />;
+          case 'IMPACT': return <ImpactTheme {...props} />;
+          case 'CLEANSLATE': return <CleanSlateTheme {...props} />;
+          case 'AUTHORITY': return <AuthorityTheme {...props} />;
+          default: return <NoirTheme {...props} />;
       }
   };
 
   return (
-    <div className="h-screen w-full flex flex-col md:flex-row bg-lumina-base overflow-hidden relative">
-      
-      {/* Floating Sidebar Toggle (Desktop) */}
-      <AnimatePresence>
-        {!isSidebarOpen && !isMobile && (
-            <motion.button
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                onClick={() => setIsSidebarOpen(true)}
-                className="absolute top-4 left-4 z-50 p-3 bg-lumina-surface border border-lumina-highlight rounded-xl text-white shadow-2xl hover:bg-lumina-highlight transition-colors hidden md:flex"
-            >
-                <PanelLeftOpen size={20} />
-            </motion.button>
-        )}
-      </AnimatePresence>
+    <div className="fixed inset-0 z-[60] bg-[#1a1a1a] flex flex-col md:flex-row h-screen w-screen overflow-hidden">
+        {/* Sidebar */}
+        <SiteBuilderSidebar 
+            isSidebarOpen={isSidebarOpen}
+            setIsSidebarOpen={setIsSidebarOpen}
+            isMobile={isMobile}
+            localSite={localSite}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            activePageId={activePageId}
+            setActivePageId={setActivePageId}
+            activePageData={activePageData}
+            hasChanges={hasChanges}
+            themes={THEMES}
+            onExit={() => onExit && onExit()}
+            onSave={() => onUpdateConfig({ ...config, site: localSite })}
+            handleGlobalChange={handleGlobalChange}
+            handleContentChange={handleContentChange}
+            handleAddSection={handleAddSection}
+            handleUpdateSection={handleUpdateSection}
+            handleDeleteSection={handleDeleteSection}
+            handleMoveSection={() => {}} // Implemented via drag/drop reorder instead
+            handleReorderSections={handleReorderSections}
+            getActiveSections={getActiveSections}
+            selectedSectionId={selectedSectionId}
+            setSelectedSectionId={setSelectedSectionId}
+            handleAddPage={handleAddPage}
+            handleDeletePage={handleDeletePage}
+            newPageName={newPageName}
+            setNewPageName={setNewPageName}
+            newGalleryUrl={newGalleryUrl}
+            setNewGalleryUrl={setNewGalleryUrl}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+        />
 
-      <SiteBuilderSidebar
-          isSidebarOpen={isSidebarOpen}
-          setIsSidebarOpen={setIsSidebarOpen}
-          isMobile={isMobile}
-          localSite={localSite}
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          activePageId={activePageId}
-          setActivePageId={setActivePageId}
-          activePageData={activePageData}
-          hasChanges={hasChanges}
-          themes={THEMES}
-          onExit={onExit || (() => {})}
-          onSave={handleSave}
-          handleGlobalChange={handleGlobalChange}
-          handleContentChange={handleContentChange}
-          handleAddSection={handleAddSection}
-          handleUpdateSection={handleUpdateSection}
-          handleDeleteSection={handleDeleteSection}
-          handleMoveSection={() => {}} // Deprecated in favor of drag/drop reorder
-          handleReorderSections={handleReorderSections}
-          getActiveSections={getActiveSections}
-          selectedSectionId={selectedSectionId}
-          setSelectedSectionId={setSelectedSectionId}
-          handleAddPage={handleAddPage}
-          handleDeletePage={handleDeletePage}
-          newPageName={newPageName}
-          setNewPageName={setNewPageName}
-          newGalleryUrl={newGalleryUrl}
-          setNewGalleryUrl={setNewGalleryUrl}
-          canUndo={canUndo}
-          canRedo={canRedo}
-          onUndo={handleUndo}
-          onRedo={handleRedo}
-      />
+        {/* Preview Area */}
+        <div className="flex-1 flex flex-col relative h-full bg-[#111]">
+            <div className="h-14 border-b border-lumina-highlight flex justify-between items-center px-6 bg-lumina-surface shrink-0">
+                <div className="flex bg-lumina-base rounded-lg p-1 border border-lumina-highlight">
+                    <button onClick={() => setPreviewMode('DESKTOP')} className={`p-2 rounded ${previewMode === 'DESKTOP' ? 'bg-lumina-highlight text-white' : 'text-lumina-muted'}`}><Monitor size={16}/></button>
+                    <button onClick={() => setPreviewMode('MOBILE')} className={`p-2 rounded ${previewMode === 'MOBILE' ? 'bg-lumina-highlight text-white' : 'text-lumina-muted'}`}><Smartphone size={16}/></button>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button onClick={handleUndo} disabled={!canUndo} className="p-2 text-lumina-muted hover:text-white disabled:opacity-30"><Undo2 size={18}/></button>
+                    <button onClick={handleRedo} disabled={!canRedo} className="p-2 text-lumina-muted hover:text-white disabled:opacity-30"><Redo2 size={18}/></button>
+                    <div className="h-4 w-px bg-lumina-highlight mx-2"></div>
+                    <a href={publicUrl} target="_blank" className="flex items-center gap-2 text-xs font-bold text-emerald-400 hover:text-emerald-300">
+                        <Globe size={14}/> View Live
+                    </a>
+                </div>
+                {!isSidebarOpen && !isMobile && (
+                    <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-lumina-surface border border-lumina-highlight rounded text-white absolute left-4 top-3 hover:bg-lumina-highlight">
+                        <PanelLeftOpen size={18}/>
+                    </button>
+                )}
+            </div>
 
-      {/* --- PREVIEW AREA --- */}
-      <div className="flex-1 flex flex-col h-[60vh] md:h-full bg-[#111] relative order-1 md:order-2">
-          <div className="h-14 border-b border-lumina-highlight flex justify-center items-center gap-4 bg-lumina-base z-10 shrink-0">
-              {/* Undo/Redo Controls */}
-              <div className="flex items-center gap-2 mr-4 border-r border-lumina-highlight pr-4">
-                  <button onClick={handleUndo} disabled={!canUndo} className="p-2 text-lumina-muted hover:text-white disabled:opacity-30 disabled:hover:text-lumina-muted" title="Undo (Cmd+Z)">
-                      <Undo2 size={18} />
-                  </button>
-                  <button onClick={handleRedo} disabled={!canRedo} className="p-2 text-lumina-muted hover:text-white disabled:opacity-30 disabled:hover:text-lumina-muted" title="Redo (Cmd+Shift+Z)">
-                      <Redo2 size={18} />
-                  </button>
-              </div>
-
-              <button onClick={() => setPreviewMode('DESKTOP')} className={`p-2 rounded-lg transition-colors ${previewMode === 'DESKTOP' ? 'text-white bg-lumina-highlight' : 'text-lumina-muted hover:text-white'}`}><Monitor size={18} /></button>
-              <button onClick={() => setPreviewMode('MOBILE')} className={`p-2 rounded-lg transition-colors ${previewMode === 'MOBILE' ? 'text-white bg-lumina-highlight' : 'text-lumina-muted hover:text-white'}`}><Smartphone size={18} /></button>
-              <div className="w-px h-6 bg-lumina-highlight mx-2"></div>
-              <a href={publicUrl} target="_blank" className="flex items-center gap-2 text-xs font-bold text-lumina-accent hover:underline bg-lumina-accent/10 px-3 py-1 rounded-full border border-lumina-accent/20"><Globe size={12} /> Live</a>
-          </div>
-
-          <div className="flex-1 overflow-hidden flex items-center justify-center bg-neutral-900 p-4 md:p-8 relative">
-              <div className="absolute inset-0 opacity-10 pointer-events-none" style={{backgroundImage: 'radial-gradient(#333 1px, transparent 1px)', backgroundSize: '20px 20px'}}></div>
-              <motion.div layout className={`bg-white shadow-2xl overflow-hidden transition-all duration-500 ease-in-out relative ${previewMode === 'MOBILE' ? 'w-[375px] h-[812px] rounded-[3rem] border-[8px] border-gray-900 ring-4 ring-gray-800' : 'w-full h-full rounded-lg border border-lumina-highlight'}`}>
-                  {previewMode === 'MOBILE' && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-gray-900 rounded-b-xl z-50"></div>}
-                  
-                  {/* USING IFRAME COMPONENT FOR ISOLATION */}
-                  <SitePreviewFrame className="w-full h-full">
-                      {renderTheme()}
-                  </SitePreviewFrame>
-              </motion.div>
-          </div>
-      </div>
+            <div className="flex-1 overflow-hidden relative flex items-center justify-center bg-[#0a0a0a] p-8">
+                <motion.div 
+                    layout
+                    className={`bg-white shadow-2xl transition-all duration-500 overflow-hidden relative ${previewMode === 'MOBILE' ? 'w-[375px] h-[750px] rounded-[3rem] border-8 border-[#333]' : 'w-full h-full rounded-lg'}`}
+                >
+                    {previewMode === 'MOBILE' && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-[#333] rounded-b-xl z-50"></div>}
+                    
+                    <SitePreviewFrame className="w-full h-full bg-white">
+                        {renderTheme()}
+                    </SitePreviewFrame>
+                </motion.div>
+            </div>
+        </div>
     </div>
   );
 };

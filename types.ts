@@ -49,7 +49,7 @@ export interface Transaction {
   isRecurring?: boolean;
   submittedBy?: string;
   ownerId?: string;
-  recipientId?: string; // New field to track who received the payment (for staff commission)
+  recipientId?: string; 
 }
 
 export interface BookingItem {
@@ -58,7 +58,7 @@ export interface BookingItem {
   quantity: number;
   unitPrice: number;
   total: number;
-  cost?: number; // COGS per item
+  cost?: number; 
 }
 
 export interface PackageCostItem {
@@ -72,7 +72,7 @@ export interface Package {
   id: string;
   name: string;
   price: number;
-  duration: number; // in hours
+  duration: number; 
   features: string[];
   active: boolean;
   archived?: boolean;
@@ -94,7 +94,7 @@ export interface TimeLog {
     userId: string;
     startTime: string;
     endTime?: string;
-    duration?: number; // Minutes
+    duration?: number; 
     note?: string;
 }
 
@@ -147,11 +147,11 @@ export interface Booking {
   studio: string;
   contractStatus: 'PENDING' | 'SIGNED';
   contractSignedDate?: string;
-  contractSignature?: string; // Base64 or URL
+  contractSignature?: string; 
   items?: BookingItem[];
   notes?: string;
   discount?: Discount;
-  deliveryUrl?: string; // Google Drive Link
+  deliveryUrl?: string; 
   tasks?: BookingTask[];
   logs?: ActivityLog[];
   files?: BookingFile[];
@@ -166,7 +166,7 @@ export interface AssetLog {
     id: string;
     date: string;
     action: 'CHECK_OUT' | 'RETURN' | 'MAINTENANCE' | 'CREATED';
-    userId?: string; // Who performed action or who it was assigned to
+    userId?: string; 
     notes?: string;
 }
 
@@ -182,7 +182,7 @@ export interface Asset {
   notes?: string;
   returnDate?: string;
   ownerId?: string;
-  logs?: AssetLog[]; // New History Log
+  logs?: AssetLog[]; 
 }
 
 export interface Client {
@@ -190,7 +190,7 @@ export interface Client {
   name: string;
   phone: string;
   email: string;
-  category: string; // Dynamic: VIP, Regular, etc.
+  category: string; 
   notes?: string;
   instagram?: string;
   joinedDate?: string;
@@ -265,11 +265,11 @@ export interface SiteSection {
         subheadline?: string;
         description?: string;
         image?: string;
-        videoUrl?: string; // NEW: Video Background Support
+        videoUrl?: string; 
         buttonText?: string;
         buttonLink?: string;
-        bookingMode?: 'INSTANT' | 'INQUIRY'; // NEW: Inquiry Mode
-        mapConfig?: { lat: number; lng: number; zoom: number; label: string }; // NEW: Maps
+        bookingMode?: 'INSTANT' | 'INQUIRY'; 
+        mapConfig?: { lat: number; lng: number; zoom: number; label: string }; 
         items?: { title: string; text: string; icon?: string }[];
         layout?: 'LEFT' | 'RIGHT' | 'CENTER';
     };
@@ -293,7 +293,7 @@ export interface SitePage {
     showBookingWidget: boolean;
     gallery: SiteGalleryItem[];
     sections: SiteSection[];
-    seo?: SiteSEO; // Added Page-Level SEO
+    seo?: SiteSEO; 
 }
 
 export interface SitePixels {
@@ -316,8 +316,10 @@ export interface SiteConfig {
     showBookingWidget: boolean;
     isPublished: boolean;
     instagramUrl?: string;
+    footerText?: string; 
+    socialLinks?: { platform: string; url: string }[]; 
     gallery: SiteGalleryItem[];
-    seo: SiteSEO; // Global Fallback
+    seo: SiteSEO; 
     pixels?: SitePixels;
     announcement?: {
         enabled: boolean;
@@ -369,7 +371,6 @@ export interface StudioConfig {
   phone: string;
   website: string;
   
-  // Financial
   taxRate: number;
   bankName: string;
   bankAccount: string;
@@ -379,7 +380,6 @@ export interface StudioConfig {
   paymentDueDays?: number;
   expenseCategories?: string[];
 
-  // Ops
   operatingHoursStart: string;
   operatingHoursEnd: string;
   bufferMinutes: number;
@@ -393,7 +393,6 @@ export interface StudioConfig {
   rooms: StudioRoom[];
   templates: WhatsAppTemplates;
   
-  // CRM & Inventory
   assetCategories?: string[];
   clientCategories?: string[];
 
@@ -440,7 +439,7 @@ export interface CalendarViewProps {
 export interface TeamViewProps {
   users: User[];
   bookings: Booking[];
-  transactions?: Transaction[]; // Added transactions prop
+  transactions?: Transaction[]; 
   onAddUser: (user: User) => void;
   onUpdateUser: (user: User) => void;
   onDeleteUser: (id: string) => void;

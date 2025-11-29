@@ -1,9 +1,9 @@
 
-import React from 'react';
-import { motion, AnimatePresence, Reorder } from 'framer-motion';
-import { Layout, Layers, Image as ImageIcon, Megaphone, File, Plus, Palette, Check, Save, ArrowLeft, Trash2, GripVertical, Home, PanelLeftClose, ChevronUp, ChevronDown, Search } from 'lucide-react';
+import React, { useState } from 'react';
+import { motion, Reorder } from 'framer-motion';
+import { Layout, Layers, Image as ImageIcon, Megaphone, File, Plus, Palette, Check, Save, ArrowLeft, Trash2, GripVertical, Home, PanelLeftClose, ChevronUp, ChevronDown, Search, Link2 } from 'lucide-react';
 import { SiteConfig, SectionType, SiteTheme, SitePage, SiteSection } from '../../types';
-import SiteSectionEditor from './SiteSectionEditor';
+import SiteSectionEditor, { DebouncedInput, DebouncedTextarea, ImageUploader } from './SiteSectionEditor';
 
 interface SiteBuilderSidebarProps {
     isSidebarOpen: boolean;
@@ -50,6 +50,21 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = (props) => {
 
     const sections = getActiveSections();
 
+    // Helper for Social Links update
+    const updateSocialLink = (platform: string, url: string) => {
+        const current = localSite.socialLinks || [];
+        const exists = current.find(l => l.platform === platform);
+        if (url.trim() === '') {
+            handleGlobalChange('socialLinks', current.filter(l => l.platform !== platform));
+        } else if (exists) {
+            handleGlobalChange('socialLinks', current.map(l => l.platform === platform ? { ...l, url } : l));
+        } else {
+            handleGlobalChange('socialLinks', [...current, { platform, url }]);
+        }
+    };
+
+    const getSocialLink = (platform: string) => localSite.socialLinks?.find(l => l.platform === platform)?.url || '';
+
     return (
         <motion.div 
             className="bg-lumina-surface/95 backdrop-blur-xl border-r border-lumina-highlight flex flex-col shadow-2xl z-20 order-2 md:order-1 overflow-hidden"
@@ -72,7 +87,7 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = (props) => {
                             <h2 className="font-bold text-white text-sm">Site Editor</h2>
                             <div className="flex items-center gap-2">
                                 <span className={`w-2 h-2 rounded-full ${hasChanges ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`}></span>
-                                <span className="text-[10px] text-lumina-muted hidden md:inline">{hasChanges ? 'Unsaved' : 'Published'}</span>
+                                <span className="text-[10px] text-lumina-muted hidden md:inline">{hasChanges ? 'Draft' : 'Saved'}</span>
                             </div>
                         </div>
                     </div>
@@ -117,12 +132,7 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = (props) => {
                                         {page.title}
                                     </button>
                                 ))}
-                                <button 
-                                    onClick={() => setActiveTab('PAGES')}
-                                    className={`px-2 py-1.5 rounded-lg text-lumina-muted hover:text-white hover:bg-lumina-highlight transition-colors`}
-                                >
-                                    <Plus size={14} />
-                                </button>
+                                <button onClick={() => setActiveTab('PAGES')} className={`px-2 py-1.5 rounded-lg text-lumina-muted hover:text-white hover:bg-lumina-highlight transition-colors`}><Plus size={14} /></button>
                             </div>
                         </div>
 
@@ -132,7 +142,7 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = (props) => {
                                 { id: 'CONTENT', icon: Layout, label: 'Design' },
                                 { id: 'SECTIONS', icon: Layers, label: 'Blocks' },
                                 { id: 'GALLERY', icon: ImageIcon, label: 'Gallery' },
-                                { id: 'MARKETING', icon: Megaphone, label: 'SEO' },
+                                { id: 'MARKETING', icon: Megaphone, label: 'Settings' },
                                 { id: 'PAGES', icon: File, label: 'Pages' }
                             ].map((tab) => (
                                 <button 
@@ -156,32 +166,59 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = (props) => {
                                 <div className="space-y-6">
                                     <div className="space-y-3">
                                         <h3 className="text-xs font-bold text-lumina-muted uppercase tracking-widest flex items-center gap-2"><Palette size={14}/> Theme Selection</h3>
-                                        <div className="grid grid-cols-3 gap-2">
+                                        <div className="grid grid-cols-2 gap-3">
                                             {themes.map((theme) => (
                                                 <button
                                                     key={theme.id}
                                                     onClick={() => handleGlobalChange('theme', theme.id)}
-                                                    className={`group relative aspect-square rounded-xl overflow-hidden border-2 transition-all ${localSite.theme === theme.id ? 'border-lumina-accent ring-2 ring-lumina-accent/30 scale-105 z-10' : 'border-lumina-highlight hover:border-white/50'}`}
+                                                    className={`group relative flex flex-col gap-2 p-3 rounded-xl border transition-all text-left ${localSite.theme === theme.id ? 'border-lumina-accent bg-lumina-accent/10 shadow-lg' : 'border-lumina-highlight hover:border-white/50 bg-lumina-base'}`}
                                                 >
-                                                    <div className="absolute inset-0" style={{ backgroundColor: theme.color }}></div>
-                                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
-                                                        {localSite.theme === theme.id && <Check size={20} className="text-white drop-shadow-md" />}
+                                                    <div className="flex justify-between w-full">
+                                                        <span className="text-xs font-bold text-white block">{theme.label}</span>
+                                                        {localSite.theme === theme.id && <Check size={14} className="text-lumina-accent" />}
                                                     </div>
+                                                    <div className="w-full h-12 rounded-lg shadow-inner border border-black/10 shrink-0" style={{ backgroundColor: theme.color }}></div>
                                                 </button>
                                             ))}
                                         </div>
                                     </div>
                                     <div className="space-y-4 border-t border-lumina-highlight pt-6">
                                         <h3 className="text-xs font-bold text-lumina-muted uppercase tracking-widest flex items-center gap-2"><Layout size={14}/> {activePageId === 'HOME' ? 'Global Content' : 'Page Content'}</h3>
-                                        <div><label className="text-[10px] font-bold text-lumina-muted uppercase mb-1 block">Page Title</label><input value={activePageData.title} onChange={(e) => handleContentChange('title', e.target.value)} className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-2 text-sm text-white focus:border-lumina-accent outline-none"/></div>
-                                        <div><label className="text-[10px] font-bold text-lumina-muted uppercase mb-1 block">Hero Headline</label><textarea value={activePageData.headline} onChange={(e) => handleContentChange('headline', e.target.value)} className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-2 text-sm text-white focus:border-lumina-accent outline-none min-h-[80px]"/></div>
+                                        
+                                        <div>
+                                            <label className="text-[10px] font-bold text-lumina-muted uppercase mb-1 block">Title / Brand Name</label>
+                                            <DebouncedInput 
+                                                value={activePageData.title} 
+                                                onChange={(val: string) => handleContentChange('title', val)} 
+                                                className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-2 text-sm text-white focus:border-lumina-accent outline-none"
+                                            />
+                                        </div>
+                                        
+                                        <div>
+                                            <label className="text-[10px] font-bold text-lumina-muted uppercase mb-1 block">Main Headline</label>
+                                            <DebouncedTextarea 
+                                                value={activePageData.headline} 
+                                                onChange={(val: string) => handleContentChange('headline', val)} 
+                                                className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-2 text-sm text-white focus:border-lumina-accent outline-none min-h-[80px]"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="text-[10px] font-bold text-lumina-muted uppercase mb-1 block">Hero Image</label>
+                                            <ImageUploader 
+                                                value={activePageData.heroImage}
+                                                onChange={(url: string) => handleContentChange('heroImage', url)}
+                                                className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-2 text-xs text-white focus:border-lumina-accent outline-none"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             )}
+                            
                             {activeTab === 'SECTIONS' && (
                                 <div className="space-y-6">
                                     {activePageId === 'HOME' ? (
-                                        <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl text-center"><p className="text-xs text-amber-200 font-bold">Section Manager is disabled for Home Page.</p></div>
+                                        <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl text-center"><p className="text-xs text-amber-200 font-bold">Standard Layout. To add custom blocks, create a new page.</p></div>
                                     ) : (
                                         <>
                                             <div className="grid grid-cols-2 gap-2">
@@ -216,11 +253,17 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = (props) => {
                                     )}
                                 </div>
                             )}
+
                             {activeTab === 'GALLERY' && (
                                 <div className="space-y-4">
-                                    <div className="flex gap-2">
-                                        <input value={newGalleryUrl} onChange={(e) => setNewGalleryUrl(e.target.value)} className="flex-1 bg-lumina-base border border-lumina-highlight rounded-lg p-2 text-xs text-white focus:border-lumina-accent outline-none" placeholder="Image URL..." />
-                                        <button onClick={() => { if(newGalleryUrl) { handleGlobalChange('gallery', [...localSite.gallery, {id: `g-${Date.now()}`, url: newGalleryUrl, caption: ''}]); setNewGalleryUrl(''); } }} className="px-3 bg-lumina-accent text-lumina-base rounded-lg font-bold text-xs">Add</button>
+                                    <div className="p-4 bg-lumina-base border border-lumina-highlight rounded-xl">
+                                        <label className="text-[10px] font-bold text-lumina-muted uppercase mb-2 block">Add New Image</label>
+                                        <ImageUploader 
+                                            value={newGalleryUrl}
+                                            onChange={setNewGalleryUrl}
+                                            className="w-full bg-lumina-surface border border-lumina-highlight rounded-lg p-2 text-xs text-white focus:border-lumina-accent outline-none mb-2"
+                                        />
+                                        <button onClick={() => { if(newGalleryUrl) { handleGlobalChange('gallery', [...localSite.gallery, {id: `g-${Date.now()}`, url: newGalleryUrl, caption: ''}]); setNewGalleryUrl(''); } }} className="w-full py-2 bg-lumina-accent text-lumina-base rounded-lg font-bold text-xs mt-2">Add to Gallery</button>
                                     </div>
                                     <div className="grid grid-cols-2 gap-2">
                                         {localSite.gallery.map((img) => (
@@ -232,38 +275,64 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = (props) => {
                                     </div>
                                 </div>
                             )}
+
                             {activeTab === 'MARKETING' && (
                                 <div className="space-y-6">
+                                    {/* Footer & Socials */}
                                     <div className="space-y-4">
+                                        <h3 className="text-xs font-bold text-lumina-muted uppercase tracking-widest flex items-center gap-2"><Link2 size={14}/> Social & Footer</h3>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-lumina-muted uppercase mb-1 block">Footer Copyright Text</label>
+                                            <DebouncedInput 
+                                                value={localSite.footerText || ''} 
+                                                onChange={(val: string) => handleGlobalChange('footerText', val)} 
+                                                className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-2 text-sm text-white focus:border-lumina-accent outline-none"
+                                                placeholder={`© ${new Date().getFullYear()} ${localSite.title}`}
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="text-[10px] font-bold text-lumina-muted uppercase mb-1 block">Instagram URL</label>
+                                                <DebouncedInput 
+                                                    value={getSocialLink('INSTAGRAM')} 
+                                                    onChange={(val: string) => updateSocialLink('INSTAGRAM', val)} 
+                                                    className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-2 text-xs text-white"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-lumina-muted uppercase mb-1 block">TikTok URL</label>
+                                                <DebouncedInput 
+                                                    value={getSocialLink('TIKTOK')} 
+                                                    onChange={(val: string) => updateSocialLink('TIKTOK', val)} 
+                                                    className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-2 text-xs text-white"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* SEO */}
+                                    <div className="space-y-4 border-t border-lumina-highlight pt-6">
                                         <h3 className="text-xs font-bold text-lumina-muted uppercase tracking-widest flex items-center gap-2"><Search size={14}/> {activePageId === 'HOME' ? 'Global SEO' : 'Page SEO'}</h3>
                                         <div>
                                             <label className="text-[10px] font-bold text-lumina-muted uppercase mb-1 block">Meta Title</label>
-                                            <input 
+                                            <DebouncedInput 
                                                 value={activePageData.seo?.title || ''} 
-                                                onChange={(e) => handleContentChange('seo', { ...activePageData.seo, title: e.target.value })} 
+                                                onChange={(val: string) => handleContentChange('seo', { ...activePageData.seo, title: val })} 
                                                 className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-2 text-sm text-white focus:border-lumina-accent outline-none"
-                                                placeholder="Page Title for Google"
                                             />
                                         </div>
                                         <div>
                                             <label className="text-[10px] font-bold text-lumina-muted uppercase mb-1 block">Meta Description</label>
-                                            <textarea 
+                                            <DebouncedTextarea 
                                                 value={activePageData.seo?.description || ''} 
-                                                onChange={(e) => handleContentChange('seo', { ...activePageData.seo, description: e.target.value })} 
+                                                onChange={(val: string) => handleContentChange('seo', { ...activePageData.seo, description: val })} 
                                                 className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-2 text-sm text-white focus:border-lumina-accent outline-none min-h-[100px]"
-                                                placeholder="Description for search results"
                                             />
                                         </div>
                                     </div>
-                                    {activePageId === 'HOME' && (
-                                        <div className="space-y-4 border-t border-lumina-highlight pt-6">
-                                            <h3 className="text-xs font-bold text-lumina-muted uppercase tracking-widest">Tracking Pixels</h3>
-                                            <div><label className="text-[10px] font-bold text-lumina-muted uppercase mb-1 block">Facebook Pixel ID</label><input value={localSite.pixels?.facebookPixelId || ''} onChange={(e) => handleGlobalChange('pixels', { ...localSite.pixels, facebookPixelId: e.target.value })} className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-2 text-sm text-white focus:border-lumina-accent outline-none"/></div>
-                                            <div><label className="text-[10px] font-bold text-lumina-muted uppercase mb-1 block">Google Analytics ID</label><input value={localSite.pixels?.googleTagId || ''} onChange={(e) => handleGlobalChange('pixels', { ...localSite.pixels, googleTagId: e.target.value })} className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-2 text-sm text-white focus:border-lumina-accent outline-none"/></div>
-                                        </div>
-                                    )}
                                 </div>
                             )}
+
                             {activeTab === 'PAGES' && (
                                 <div className="space-y-6">
                                     <div className="flex gap-2">
