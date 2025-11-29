@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { SiteSection, SectionType } from '../../types';
+import { SiteSection } from '../../types';
 import { Trash2, Video, MousePointerClick, Upload, Loader2, Image as ImageIcon } from 'lucide-react';
 import { uploadFile } from '../../utils/storageUtils';
 
@@ -8,7 +8,6 @@ import { uploadFile } from '../../utils/storageUtils';
 export const DebouncedInput = ({ value, onChange, className, placeholder, type = 'text', ...props }: any) => {
     const [localValue, setLocalValue] = useState(value);
     
-    // Sync local state when prop changes (external update)
     useEffect(() => {
         setLocalValue(value);
     }, [value]);

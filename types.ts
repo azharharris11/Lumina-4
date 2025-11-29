@@ -71,6 +71,7 @@ export interface PackageCostItem {
 export interface Package {
   id: string;
   name: string;
+  category?: string; // New: Grouping (Wedding, Portrait, etc)
   price: number;
   duration: number; 
   features: string[];
@@ -80,6 +81,14 @@ export interface Package {
   costBreakdown?: PackageCostItem[];
   defaultTasks?: string[];
   defaultAssetIds?: string[];
+  
+  // New Financial Logic
+  depositOverride?: {
+      type: 'PERCENTAGE' | 'FIXED';
+      value: number;
+  };
+  taxIncluded?: boolean; // If true, price includes tax. If false, tax is added on top.
+
   ownerId?: string;
 }
 

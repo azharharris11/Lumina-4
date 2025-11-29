@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion, Reorder } from 'framer-motion';
-import { Layout, Layers, Image as ImageIcon, Megaphone, File, Plus, Palette, Check, Save, ArrowLeft, Trash2, GripVertical, Home, PanelLeftClose, ChevronUp, ChevronDown, Search, Link2, Settings, Eye, EyeOff } from 'lucide-react';
+import { Layout, Layers, Image as ImageIcon, File, Plus, Palette, Check, Save, ArrowLeft, Trash2, GripVertical, Home, PanelLeftClose, ChevronUp, ChevronDown, Search, Link2, Settings, Eye, EyeOff } from 'lucide-react';
 import { SiteConfig, SectionType, SiteTheme, SitePage, SiteSection } from '../../types';
 import SiteSectionEditor, { DebouncedInput, DebouncedTextarea, ImageUploader } from './SiteSectionEditor';
 

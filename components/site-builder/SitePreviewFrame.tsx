@@ -16,12 +16,14 @@ const SitePreviewFrame: React.FC<SitePreviewFrameProps> = ({ children, className
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    if (!contentRef?.contentWindow || isInitialized.current) return;
+    if (!contentRef?.contentWindow) return;
 
     const doc = contentRef.contentWindow.document;
     
-    // Only inject if not already present
-    if (!doc.getElementById('site-preview-styles')) {
+    // Only inject if not already present to avoid FOUC on re-renders
+    if (!isInitialized.current && !doc.getElementById('site-preview-styles')) {
+        isInitialized.current = true; // Mark as initialized immediately
+
         // 1. Initial Hide to prevent FOUC
         doc.body.style.opacity = '0';
         doc.body.style.transition = 'opacity 0.3s ease';
@@ -67,8 +69,6 @@ const SitePreviewFrame: React.FC<SitePreviewFrameProps> = ({ children, className
           ::-webkit-scrollbar-thumb { background: #292524; border-radius: 3px; }
         `;
         doc.head.appendChild(style);
-        
-        isInitialized.current = true;
     }
   }, [contentRef]);
 
