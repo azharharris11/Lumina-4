@@ -139,6 +139,15 @@ export interface BookingComment {
     timestamp: string;
 }
 
+export interface ProofingItem {
+    id: string;
+    url: string;
+    thumbnail: string;
+    filename: string;
+    selected: boolean;
+    feedback?: string;
+}
+
 export interface Booking {
   id: string;
   clientName: string;
@@ -168,6 +177,8 @@ export interface Booking {
   timeLogs?: TimeLog[];
   taxSnapshot?: number;
   costSnapshot?: PackageCostItem[];
+  proofingData?: ProofingItem[];
+  selectionSubmitted?: boolean; // New Flag
   ownerId?: string;
 }
 
