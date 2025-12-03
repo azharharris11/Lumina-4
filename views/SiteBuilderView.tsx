@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { SiteBuilderViewProps, SitePage, SiteSection, SectionType, SiteTheme, SiteConfig } from '../types';
-import { Globe, Smartphone, Monitor, PanelLeftOpen, Undo2, Redo2, UploadCloud } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { SiteBuilderViewProps, SitePage, SiteSection, SectionType, SiteTheme, SiteConfig, PublicBookingSubmission } from '../types';
+import { Globe, Smartphone, Monitor, PanelLeftOpen, Undo2, Redo2 } from 'lucide-react';
 import SitePreviewFrame from '../components/site-builder/SitePreviewFrame';
 import SiteBuilderSidebar from '../components/site-builder/SiteBuilderSidebar';
 
@@ -22,6 +22,7 @@ import AuthorityTheme from '../components/site-builder/themes/AuthorityTheme';
 
 interface ExtendedSiteBuilderViewProps extends SiteBuilderViewProps {
     onExit?: () => void;
+    onPublicBooking?: (data: PublicBookingSubmission) => void;
 }
 
 const THEMES: {id: SiteTheme, label: string, color: string, textColor: string}[] = [
@@ -107,7 +108,13 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasChanges]);
 
-  const publicUrl = `${window.location.origin}?site=${config.ownerId || 'me'}`;
+  // Updated Public URL Logic: Uses Subdomain if available
+  const publicUrl = useMemo(() => {
+      if (localSite.subdomain) {
+          return `https://${localSite.subdomain}.luminaphotocrm.com`;
+      }
+      return `${window.location.origin}?site=${config.ownerId || 'me'}`;
+  }, [localSite.subdomain, config.ownerId]);
 
   const activePageData = useMemo(() => {
       if (activePageId === 'HOME') return localSite;
@@ -226,6 +233,7 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
           packages,
           users,
           config,
+          bookings,
           onBooking: onPublicBooking
       };
       
@@ -292,13 +300,25 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
                     <button onClick={() => setPreviewMode('DESKTOP')} className={`p-2 rounded ${previewMode === 'DESKTOP' ? 'bg-lumina-highlight text-white' : 'text-lumina-muted'}`}><Monitor size={16}/></button>
                     <button onClick={() => setPreviewMode('MOBILE')} className={`p-2 rounded ${previewMode === 'MOBILE' ? 'bg-lumina-highlight text-white' : 'text-lumina-muted'}`}><Smartphone size={16}/></button>
                 </div>
-                <div className="flex items-center gap-2">
-                    <button onClick={handleUndo} disabled={!canUndo} className="p-2 text-lumina-muted hover:text-white disabled:opacity-30"><Undo2 size={18}/></button>
-                    <button onClick={handleRedo} disabled={!canRedo} className="p-2 text-lumina-muted hover:text-white disabled:opacity-30"><Redo2 size={18}/></button>
-                    <div className="h-4 w-px bg-lumina-highlight mx-2"></div>
-                    <a href={publicUrl} target="_blank" className="flex items-center gap-2 text-xs font-bold text-emerald-400 hover:text-emerald-300">
-                        <Globe size={14}/> View Live
-                    </a>
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <button onClick={handleUndo} disabled={!canUndo} className="p-2 text-lumina-muted hover:text-white disabled:opacity-30"><Undo2 size={18}/></button>
+                        <button onClick={handleRedo} disabled={!canRedo} className="p-2 text-lumina-muted hover:text-white disabled:opacity-30"><Redo2 size={18}/></button>
+                    </div>
+                    <div className="h-4 w-px bg-lumina-highlight"></div>
+                    {hasChanges ? (
+                        <span className="flex items-center gap-2 text-xs font-bold text-lumina-muted cursor-not-allowed">
+                            <Globe size={14}/> Save to View Live
+                        </span>
+                    ) : (
+                        <a 
+                            href={publicUrl} 
+                            target="_blank"
+                            className="flex items-center gap-2 text-xs font-bold transition-colors text-emerald-400 hover:text-emerald-300"
+                        >
+                            <Globe size={14}/> View Live Site
+                        </a>
+                    )}
                 </div>
                 {!isSidebarOpen && !isMobile && (
                     <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-lumina-surface border border-lumina-highlight rounded text-white absolute left-4 top-3 hover:bg-lumina-highlight">

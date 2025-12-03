@@ -13,7 +13,7 @@ import BoldTheme from '../components/site-builder/themes/BoldTheme';
 import ImpactTheme from '../components/site-builder/themes/ImpactTheme';
 import CleanSlateTheme from '../components/site-builder/themes/CleanSlateTheme';
 import AuthorityTheme from '../components/site-builder/themes/AuthorityTheme';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, SearchX, ArrowRight, Aperture } from 'lucide-react';
 import ClientPortal from '../components/public/ClientPortal';
 
 interface PublicSiteViewProps {
@@ -33,19 +33,57 @@ const PublicSiteView: React.FC<PublicSiteViewProps> = ({ config, packages, users
         return (
             <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white">
                 <Loader2 className="w-10 h-10 animate-spin text-lumina-accent mb-4" />
-                <p className="text-sm font-mono text-lumina-muted">Loading...</p>
+                <p className="text-sm font-mono text-lumina-muted">Loading Studio...</p>
             </div>
         );
     }
 
     if (error || !config) {
         return (
-            <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white p-6 text-center">
-                <div className="p-4 bg-rose-500/10 rounded-full mb-4 border border-rose-500/20">
-                    <AlertCircle className="w-8 h-8 text-rose-500" />
+            <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6 relative overflow-hidden">
+                {/* Background Pattern */}
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,#1a1a1a_0%,#000000_100%)] z-0"></div>
+                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10 z-0 pointer-events-none"></div>
+
+                <div className="relative z-10 w-full max-w-lg text-center">
+                    <div className="w-20 h-20 bg-lumina-surface border border-lumina-highlight rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-lumina-accent/10">
+                        <Aperture className="w-10 h-10 text-lumina-muted" />
+                    </div>
+                    
+                    <h1 className="text-3xl md:text-4xl font-display font-bold mb-4 tracking-tight text-white">Studio Not Found</h1>
+                    
+                    <p className="text-lumina-muted text-lg leading-relaxed mb-8">
+                        The web address you entered doesn't point to an active studio site yet. 
+                        It might be a typo, or the studio hasn't launched.
+                    </p>
+
+                    <div className="bg-lumina-surface/50 border border-lumina-highlight rounded-xl p-4 mb-8 backdrop-blur-sm inline-block w-full">
+                        <p className="text-xs text-lumina-muted uppercase tracking-widest font-bold mb-2">Technical Details</p>
+                        <div className="flex items-center justify-center gap-2 text-rose-400 font-mono text-xs">
+                            <AlertCircle size={14} />
+                            <span>ERR_SITE_NOT_FOUND: {error || "UNKNOWN_DOMAIN"}</span>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col md:flex-row gap-4 justify-center">
+                        <a 
+                            href="https://luminaphotocrm.com" 
+                            className="bg-lumina-accent text-black px-6 py-3 rounded-lg font-bold hover:bg-white transition-colors flex items-center justify-center gap-2"
+                        >
+                            Visit Lumina Home <ArrowRight size={16}/>
+                        </a>
+                        <button 
+                            onClick={() => window.history.back()}
+                            className="px-6 py-3 rounded-lg font-bold text-lumina-muted hover:text-white transition-colors"
+                        >
+                            Go Back
+                        </button>
+                    </div>
                 </div>
-                <h1 className="text-2xl font-bold mb-2">Access Error</h1>
-                <p className="text-lumina-muted max-w-md">{error || "The requested page could not be loaded."}</p>
+                
+                <div className="absolute bottom-8 text-xs text-lumina-muted font-mono opacity-50">
+                    Lumina Studio Systems • {new Date().getFullYear()}
+                </div>
             </div>
         );
     }
@@ -93,8 +131,8 @@ const PublicSiteView: React.FC<PublicSiteViewProps> = ({ config, packages, users
         <div className="w-full min-h-screen">
             {renderTheme()}
             {/* Lumina Badge */}
-            <div className="fixed bottom-4 right-4 z-[100]">
-                <a href="/" target="_blank" className="flex items-center gap-2 bg-black/80 backdrop-blur text-white px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border border-white/10 hover:bg-black hover:border-lumina-accent transition-colors">
+            <div className="fixed bottom-4 right-4 z-[100] opacity-0 hover:opacity-100 transition-opacity duration-300">
+                <a href="https://luminaphotocrm.com" target="_blank" className="flex items-center gap-2 bg-black/80 backdrop-blur text-white px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border border-white/10 hover:bg-black hover:border-lumina-accent transition-colors">
                     <div className="w-2 h-2 bg-lumina-accent rounded-full"></div>
                     Powered by Lumina
                 </a>

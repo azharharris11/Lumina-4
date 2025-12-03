@@ -1,17 +1,17 @@
 
-import { initializeApp, getApps, getApp } from "firebase/app";
+import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
+  GoogleAuthProvider, 
   onAuthStateChanged, 
   signOut, 
   signInWithEmailAndPassword, 
   signInWithPopup, 
   createUserWithEmailAndPassword, 
-  updateProfile,
-  GoogleAuthProvider
-} from "firebase/auth";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+  updateProfile 
+} from 'firebase/auth';
+import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCKfFRG53GggBNgMyEuBGy-FJKFf4Eqni8",
@@ -23,22 +23,26 @@ const firebaseConfig = {
   measurementId: "G-BRW8RLKY2X"
 };
 
-// Initialize Firebase
-// Singleton pattern to prevent hot-reload errors in development
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+// Initialize Firebase (Modular)
+const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-
-// Initialize Firestore with persistent cache settings directly (Modern Approach)
-// This replaces the deprecated enableIndexedDbPersistence() call
-const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager()
-  }),
-  ignoreUndefinedProperties: true
-});
-
+const db = getFirestore(app);
 const storage = getStorage(app);
 const googleProvider = new GoogleAuthProvider();
+
+// Attempt to enable offline persistence (Best effort)
+try {
+  enableIndexedDbPersistence(db).catch((err) => {
+      if (err.code == 'failed-precondition') {
+          console.warn('Multiple tabs open, persistence can only be enabled in one tab at a a time.');
+      } else if (err.code == 'unimplemented') {
+          console.warn('The current browser does not support all of the features required to enable persistence');
+      }
+  });
+} catch(e) {
+  // Ignore errors during persistence init
+  console.debug("Persistence init skipped or failed", e);
+}
 
 export { 
   auth, 

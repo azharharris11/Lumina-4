@@ -28,7 +28,7 @@ import { Booking, Role } from './types';
 import { ShieldAlert } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import { useStudio } from './contexts/StudioContext';
-import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore'; 
+import { doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore'; 
 import { db } from './firebase';
 
 const VIEW_PERMISSIONS: Record<string, Role[]> = {
@@ -79,8 +79,6 @@ const App: React.FC = () => {
   
   // Initialize Google Token (Persistent Mode)
   const [googleToken, setGoogleToken] = useState<string | null>(() => {
-      // We no longer check for expiry time here to prevent annoying auto-logouts.
-      // We will let the API call fail (401) if the token is actually invalid.
       return localStorage.getItem('lumina_g_token');
   });
   
@@ -88,6 +86,7 @@ const App: React.FC = () => {
   const [portalBooking, setPortalBooking] = useState<Booking | null>(null);
   const [publicConfig, setPublicConfig] = useState<any>(null);
   const [isPublicLoading, setIsPublicLoading] = useState(false);
+  const [publicError, setPublicError] = useState<string | null>(null);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -100,33 +99,93 @@ const App: React.FC = () => {
     else document.body.classList.add('light-mode');
   }, [isDarkMode]);
 
-  // Handle Public Site URL
+  // --- SUBDOMAIN, CUSTOM DOMAIN & URL ROUTING LOGIC ---
   useEffect(() => {
+      const hostname = window.location.hostname;
       const params = new URLSearchParams(window.location.search);
       const publicSiteId = params.get('site');
       const portalBookingId = params.get('booking');
 
-      if (publicSiteId) {
+      // Define your main domains here (Production + Localhost)
+      const MAIN_DOMAINS = [
+          'localhost', 
+          '127.0.0.1',
+          'luminaphotocrm.com', 
+          'www.luminaphotocrm.com', 
+          'app.luminaphotocrm.com', // Cloudflare Worker / App Domain
+          'studio-manager-lumina-2911-15-53-276331844787.us-west1.run.app' // Google Cloud Run
+      ];
+      
+      const isMainDomain = MAIN_DOMAINS.includes(hostname);
+
+      const handlePublicAccess = async (identifier: string, method: 'ID' | 'SUBDOMAIN' | 'CUSTOM_DOMAIN') => {
           setViewMode('PUBLIC');
           setIsPublicLoading(true);
-          const fetchData = async () => {
-              try {
-                  const configRef = doc(db, "studios", publicSiteId);
+          setPublicError(null);
+          
+          try {
+              let configData = null;
+
+              if (method === 'ID') {
+                  const configRef = doc(db, "studios", identifier);
                   const configSnap = await getDoc(configRef);
-                  if (configSnap.exists()) setPublicConfig(configSnap.data());
+                  if (configSnap.exists()) configData = configSnap.data();
+              } else if (method === 'SUBDOMAIN') {
+                  // Query by subdomain
+                  const q = query(collection(db, "studios"), where("site.subdomain", "==", identifier));
+                  const querySnapshot = await getDocs(q);
+                  if (!querySnapshot.empty) {
+                      configData = querySnapshot.docs[0].data();
+                  }
+              } else if (method === 'CUSTOM_DOMAIN') {
+                  // Query by custom domain
+                  const q = query(collection(db, "studios"), where("site.customDomain", "==", identifier));
+                  const querySnapshot = await getDocs(q);
+                  if (!querySnapshot.empty) {
+                      configData = querySnapshot.docs[0].data();
+                  }
+              }
+
+              if (configData) {
+                  setPublicConfig(configData);
+                  
+                  // Check if looking for specific booking portal
                   if (portalBookingId) {
                       const bookingRef = doc(db, "bookings", portalBookingId);
                       const bookingSnap = await getDoc(bookingRef);
                       if (bookingSnap.exists()) setPortalBooking(bookingSnap.data() as Booking);
                   }
-              } catch (e) {
-                  console.error("Public Fetch Error:", e);
-              } finally {
-                  setIsPublicLoading(false);
+              } else {
+                  // Set a specific error message if not found
+                  setPublicError(identifier);
               }
-          };
-          fetchData();
+          } catch (e) {
+              console.error("Public Fetch Error:", e);
+              setPublicError("CONNECTION_ERROR");
+          } finally {
+              setIsPublicLoading(false);
+          }
+      };
+
+      if (publicSiteId) {
+          // Priority 1: Explicit Query Param (e.g. ?site=user123)
+          handlePublicAccess(publicSiteId, 'ID');
+      } else if (isMainDomain) {
+          // Priority 2: Main Domain -> Do nothing, stay on App/Landing
+          // This prevents "Studio Not Found" on the main landing page
+      } else if (hostname.endsWith('luminaphotocrm.com')) {
+          // Priority 3: Subdomain (e.g. test.luminaphotocrm.com)
+          const subdomain = hostname.replace('.luminaphotocrm.com', '');
+          // app.luminaphotocrm.com is handled in MAIN_DOMAINS above, so here we check for others
+          if (subdomain && subdomain !== 'www' && subdomain !== 'app') {
+              handlePublicAccess(subdomain, 'SUBDOMAIN');
+          }
+      } else {
+          // Priority 4: Custom Domain (e.g. www.mystudio.com)
+          // If it's not a main domain and not a subdomain, it must be a custom domain
+          handlePublicAccess(hostname, 'CUSTOM_DOMAIN');
       }
+
   }, []);
 
   const handleSetGoogleToken = (token: string | null) => {
@@ -140,10 +199,10 @@ const App: React.FC = () => {
 
   // --- RENDERING ---
 
-  if (authLoading || (currentUser && loadingData)) return <DashboardSkeleton />;
+  if (authLoading || (currentUser && loadingData && viewMode !== 'PUBLIC')) return <DashboardSkeleton />;
 
   if (viewMode === 'PUBLIC') {
-      return <PublicSiteView config={publicConfig} packages={packages} users={[]} bookings={bookings} portalBooking={portalBooking} isLoading={isPublicLoading} error={null} onBooking={(data) => { console.log("Public Booking:", data); alert("Booking submitted!"); }} />;
+      return <PublicSiteView config={publicConfig} packages={packages} users={[]} bookings={bookings} portalBooking={portalBooking} isLoading={isPublicLoading} error={publicError} onBooking={(data) => { console.log("Public Booking:", data); alert("Booking submitted!"); }} />;
   }
 
   if (!currentUser) {

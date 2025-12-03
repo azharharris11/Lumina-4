@@ -335,6 +335,7 @@ export interface SitePixels {
 
 export interface SiteConfig {
     subdomain: string;
+    customDomain?: string; // User's own domain (e.g., www.mystudio.com)
     title: string;
     headline: string;
     description: string;
