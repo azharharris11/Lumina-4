@@ -212,7 +212,8 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
       const newPage: SitePage = {
           id: `page-${Date.now()}`,
           title: newPageName,
-          slug: newPageName.toLowerCase().replace(/\s+/g, '-'),
+          // Strict URL Sanitization
+          slug: newPageName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
           headline: newPageName,
           description: '',
           heroImage: localSite.heroImage,
@@ -257,7 +258,18 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
           users,
           config,
           bookings,
-          onBooking: onPublicBooking
+          onBooking: onPublicBooking,
+          // Fix: Pass navigation handler to themes so buttons work
+          onNavigate: (pageId: string) => {
+              setActivePageId(pageId);
+              // Optional: If page has sections, switch to sections tab
+              const page = pageId === 'HOME' ? localSite : localSite.pages?.find(p => p.id === pageId);
+              // if (page && 'sections' in page && page.sections.length > 0) {
+              //     setActiveTab('SECTIONS');
+              // } else {
+              //     setActiveTab('CONTENT');
+              // }
+          }
       };
       
       switch(localSite.theme) {
@@ -351,7 +363,7 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
                 )}
             </div>
 
-            <div className="flex-1 overflow-hidden relative flex items-center justify-center bg-[#0a0a0a] p-8">
+            <div className="flex-1 overflow-hidden relative flex items-center justify-center bg-[#0a0a0a] p-8 no-scrollbar">
                 <Motion.div 
                     layout
                     className={`bg-white shadow-2xl transition-all duration-500 overflow-hidden relative border-black

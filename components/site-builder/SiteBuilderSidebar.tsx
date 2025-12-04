@@ -84,9 +84,6 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = ({
             const q = query(collection(db, "studios"), where("site.subdomain", "==", sub));
             const snap = await getDocs(q);
             
-            // If empty, it's available. 
-            // NOTE: In a real scenario, we also need to check if the current user owns it to show "Owned by you"
-            // For now, if snap is not empty, we assume taken (logic in StudioContext handles the 'save' validation)
             if (snap.empty) {
                 setSubdomainStatus('AVAILABLE');
             } else {
@@ -539,9 +536,9 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = ({
                                     </div>
 
                                     <div className="mt-3 flex gap-2 items-start">
-                                        <AlertCircle size={12} className="text-amber-500 mt-0.5 shrink-0" />
+                                        <CheckCircle2 size={12} className="text-emerald-500 mt-0.5 shrink-0" />
                                         <p className="text-[10px] text-gray-400 leading-tight">
-                                            <strong>Note on SSL:</strong> Adding CNAME alone might cause SSL errors. Your provider must support CNAME flattening or you may need to use Cloudflare for SSL provisioning.
+                                            It may take up to 24 hours for DNS to propagate globally. SSL will be provisioned automatically.
                                         </p>
                                     </div>
                                 </div>
@@ -559,6 +556,21 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = ({
                                         className="w-full bg-[#1a1a1a] border border-[#333] rounded p-2 text-sm text-white outline-none"
                                     />
                                 </div>
+                                
+                                {/* SEO SERP Preview */}
+                                <div className="p-3 bg-white rounded border border-[#333]">
+                                    <div className="text-[10px] text-gray-500 mb-1">Google Search Preview</div>
+                                    <div className="text-[#1a0dab] text-sm font-medium hover:underline cursor-pointer truncate">
+                                        {localSite.seo?.title || localSite.title}
+                                    </div>
+                                    <div className="text-[#006621] text-xs truncate">
+                                        https://{localSite.subdomain || 'your-site'}.luminaphotocrm.com
+                                    </div>
+                                    <div className="text-[#545454] text-xs line-clamp-2">
+                                        {localSite.seo?.description || localSite.description}
+                                    </div>
+                                </div>
+
                                 <div>
                                     <label className="text-[10px] text-gray-500 uppercase block mb-1 font-bold">Facebook Pixel ID</label>
                                     <DebouncedInput 
