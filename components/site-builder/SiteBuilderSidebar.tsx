@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { 
@@ -363,7 +362,10 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = ({
 
                         <div className="space-y-2">
                             <div 
-                                onClick={() => setActivePageId('HOME')}
+                                onClick={() => {
+                                    setActivePageId('HOME');
+                                    setActiveTab('CONTENT');
+                                }}
                                 className={`p-3 rounded border flex items-center justify-between cursor-pointer ${activePageId === 'HOME' ? 'bg-[#252525] border-blue-500 text-white' : 'border-[#333] text-gray-400 hover:bg-[#252525]'}`}
                             >
                                 <span className="text-sm font-bold">Home</span>
@@ -373,7 +375,10 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = ({
                             {localSite.pages?.map(page => (
                                 <div 
                                     key={page.id}
-                                    onClick={() => setActivePageId(page.id)}
+                                    onClick={() => {
+                                        setActivePageId(page.id);
+                                        setActiveTab('CONTENT');
+                                    }}
                                     className={`p-3 rounded border flex items-center justify-between cursor-pointer group ${activePageId === page.id ? 'bg-[#252525] border-blue-500 text-white' : 'border-[#333] text-gray-400 hover:bg-[#252525]'}`}
                                 >
                                     <div className="flex items-center gap-2">
