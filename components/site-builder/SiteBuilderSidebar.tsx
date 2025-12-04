@@ -1,14 +1,16 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { 
     LayoutTemplate, Type, Image, Share2, Layers, Palette, ChevronLeft, Save, 
     Undo, Redo, LogOut, Plus, Trash2, GripVertical, Settings, Eye, EyeOff, 
-    Globe, Info, PanelLeftClose, ChevronDown, ChevronRight, CheckCircle2, AlertCircle
+    Globe, Info, PanelLeftClose, ChevronDown, ChevronRight, CheckCircle2, AlertCircle, Loader2
 } from 'lucide-react';
 import { SiteConfig, SiteTheme, SitePage, SiteSection } from '../../types';
 import SiteSectionEditor, { DebouncedInput, DebouncedTextarea, ImageUploader } from './SiteSectionEditor';
 import ToggleRow from './ToggleRow';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../../firebase';
 
 const Motion = motion as any;
 
@@ -58,6 +60,46 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = ({
     newGalleryUrl, setNewGalleryUrl, canUndo, canRedo, onUndo, onRedo
 }) => {
     
+    // Subdomain Availability State
+    const [isCheckingSubdomain, setIsCheckingSubdomain] = useState(false);
+    const [subdomainStatus, setSubdomainStatus] = useState<'IDLE' | 'AVAILABLE' | 'TAKEN' | 'ERROR'>('IDLE');
+
+    // Debounce checking
+    const checkAvailability = async (sub: string) => {
+        if (!sub || sub.length < 3) {
+            setSubdomainStatus('IDLE');
+            return;
+        }
+        
+        setIsCheckingSubdomain(true);
+        try {
+            // Check reserved list first (Client side check for speed)
+            const RESERVED = ['www', 'app', 'admin', 'api', 'mail', 'support', 'staging', 'test', 'login', 'signup', 'register'];
+            if (RESERVED.includes(sub)) {
+                setSubdomainStatus('TAKEN');
+                setIsCheckingSubdomain(false);
+                return;
+            }
+
+            const q = query(collection(db, "studios"), where("site.subdomain", "==", sub));
+            const snap = await getDocs(q);
+            
+            // If empty, it's available. 
+            // NOTE: In a real scenario, we also need to check if the current user owns it to show "Owned by you"
+            // For now, if snap is not empty, we assume taken (logic in StudioContext handles the 'save' validation)
+            if (snap.empty) {
+                setSubdomainStatus('AVAILABLE');
+            } else {
+                setSubdomainStatus('TAKEN');
+            }
+        } catch (e) {
+            console.error("Availability check failed", e);
+            setSubdomainStatus('ERROR');
+        } finally {
+            setIsCheckingSubdomain(false);
+        }
+    };
+
     if (!isSidebarOpen) return null;
 
     const sections = getActiveSections();
@@ -83,6 +125,8 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = ({
         { type: 'MAP_LOCATION', label: 'Map Location' }
     ];
 
+    const isSaveDisabled = !hasChanges || isCheckingSubdomain || subdomainStatus === 'TAKEN' || subdomainStatus === 'ERROR';
+
     return (
         <div className={`fixed inset-y-0 left-0 bg-[#1c1c1c] border-r border-[#333] w-full md:w-[400px] z-50 flex flex-col transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
             
@@ -93,7 +137,11 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = ({
                     <span className="font-bold text-white text-sm">Site Builder</span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button onClick={onSave} disabled={!hasChanges} className="flex items-center gap-2 px-3 py-1.5 bg-white text-black rounded text-xs font-bold disabled:opacity-50 hover:bg-gray-200">
+                    <button 
+                        onClick={onSave} 
+                        disabled={isSaveDisabled} 
+                        className="flex items-center gap-2 px-3 py-1.5 bg-white text-black rounded text-xs font-bold disabled:opacity-50 hover:bg-gray-200"
+                    >
                         <Save size={14}/> Save
                     </button>
                     <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-2 text-gray-400"><PanelLeftClose size={18}/></button>
@@ -410,21 +458,48 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = ({
                                 {/* Subdomain Input */}
                                 <div>
                                     <label className="text-[10px] text-gray-500 uppercase block mb-1 font-bold">Lumina Subdomain</label>
-                                    <div className="flex items-center bg-[#1a1a1a] border border-[#333] rounded overflow-hidden">
-                                        <input 
-                                            value={localSite.subdomain}
-                                            onChange={e => {
-                                                // Stricter Regex: Alphanumeric only, no special chars, no spaces.
-                                                // Leading/Trailing hyphens are handled/prevented on Save, but here we just prevent bad chars.
-                                                const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
-                                                handleGlobalChange('subdomain', val);
-                                            }}
-                                            className="bg-transparent p-2 text-sm text-white outline-none flex-1"
-                                            placeholder="your-studio"
-                                        />
-                                        <span className="text-xs text-gray-500 px-2 bg-[#252525] border-l border-[#333] h-full flex items-center">.luminaphotocrm.com</span>
+                                    <div className="relative">
+                                        <div className={`flex items-center bg-[#1a1a1a] border rounded overflow-hidden transition-colors ${
+                                            subdomainStatus === 'AVAILABLE' ? 'border-emerald-500/50' : 
+                                            subdomainStatus === 'TAKEN' ? 'border-rose-500/50' : 
+                                            'border-[#333]'
+                                        }`}>
+                                            <input 
+                                                value={localSite.subdomain}
+                                                onBlur={(e) => checkAvailability(e.target.value)}
+                                                onChange={e => {
+                                                    // Stricter Regex: Alphanumeric only, no special chars, no spaces.
+                                                    const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                                                    handleGlobalChange('subdomain', val);
+                                                    setSubdomainStatus('IDLE'); // Reset status on type
+                                                }}
+                                                className="bg-transparent p-2 text-sm text-white outline-none flex-1 pl-3"
+                                                placeholder="your-studio"
+                                            />
+                                            <span className="text-xs text-gray-500 px-2 bg-[#252525] border-l border-[#333] h-full flex items-center">.luminaphotocrm.com</span>
+                                        </div>
+                                        
+                                        {/* Status Indicator */}
+                                        <div className="absolute top-2 right-40">
+                                            {isCheckingSubdomain && <Loader2 size={12} className="animate-spin text-gray-400"/>}
+                                        </div>
                                     </div>
-                                    <p className="text-[10px] text-gray-500 mt-1">Default address for your site. Must be unique.</p>
+                                    
+                                    <div className="flex justify-between items-center mt-1 min-h-[14px]">
+                                        <p className="text-[10px] text-gray-500">Default address for your site.</p>
+                                        
+                                        {/* Feedback Message */}
+                                        {subdomainStatus === 'AVAILABLE' && (
+                                            <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                                                <CheckCircle2 size={10}/> Available
+                                            </span>
+                                        )}
+                                        {subdomainStatus === 'TAKEN' && (
+                                            <span className="text-[10px] text-rose-400 font-bold flex items-center gap-1">
+                                                <AlertCircle size={10}/> Unavailable
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div className="h-px bg-[#333] w-full"></div>

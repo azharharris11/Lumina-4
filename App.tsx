@@ -108,24 +108,26 @@ const App: React.FC = () => {
       const publicSiteId = params.get('site');
       const portalBookingId = params.get('booking');
 
-      // Define main domains to prevent loops
-      // NOTE: luminaphotocrm.com is the root.
-      const ROOT_DOMAIN = 'luminaphotocrm.com';
-      const APP_DOMAINS = [
-          'localhost', 
-          '127.0.0.1',
-          ROOT_DOMAIN,
-          `www.${ROOT_DOMAIN}`, 
-          `app.${ROOT_DOMAIN}`,
-          'studio-manager-lumina-2911-15-53-276331844787.us-west1.run.app' // Cloud Run
-      ];
+      // Dynamic Root Domain Detection
+      // Use .includes to catch 'ammora.localhost' or '127.0.0.1'
+      const isLocalhost = hostname.includes('localhost') || hostname.includes('127.0.0.1');
+      const ROOT_DOMAIN = isLocalhost ? 'localhost' : 'luminaphotocrm.com';
       
-      const isMainApp = APP_DOMAINS.includes(hostname);
+      // Main domains where the App (Site Builder/Dashboard) lives
+      const MAIN_DOMAINS = [
+          'localhost',
+          '127.0.0.1',
+          'luminaphotocrm.com',
+          'www.luminaphotocrm.com',
+          'app.luminaphotocrm.com',
+          'studio-manager-lumina-2911-15-53-276331844787.us-west1.run.app' // Cloud Run Origin
+      ];
+
+      // Check if current hostname is one of the main app domains
+      // We check if it *exactly* matches one of the main domains or ends with .run.app (Cloud Run)
+      const isMainApp = MAIN_DOMAINS.some(domain => hostname === domain) || hostname.endsWith('.run.app');
 
       const handlePublicAccess = async (identifier: string, method: 'ID' | 'SUBDOMAIN' | 'CUSTOM_DOMAIN') => {
-          // If we are already logged in as the owner of this site, we might still want to see the public view
-          // OR we might want to edit. For now, we force Public View if it's a subdomain.
-          
           setViewMode('PUBLIC');
           setIsPublicLoading(true);
           setPublicError(null);
@@ -179,13 +181,21 @@ const App: React.FC = () => {
           handlePublicAccess(publicSiteId, 'ID');
       } else if (isMainApp) {
           // Priority 2: Main App Domain -> Do nothing, standard routing
+          // This ensures app.luminaphotocrm.com doesn't try to look up a studio named "app"
       } else {
           // Priority 3: Subdomain or Custom Domain
           if (hostname.endsWith(ROOT_DOMAIN)) {
-              // It's a subdomain like "ammora.luminaphotocrm.com"
+              // It's a subdomain like "ammora.luminaphotocrm.com" or "test.localhost"
+              
+              // Extract subdomain:
+              // For "test.localhost" -> remove ".localhost" -> "test"
+              // For "ammora.luminaphotocrm.com" -> remove ".luminaphotocrm.com" -> "ammora"
               const subdomain = hostname.replace(`.${ROOT_DOMAIN}`, '');
-              // Filter out known subdomains that point to main app
-              if (subdomain !== 'www' && subdomain !== 'app') {
+              
+              // Filter out reserved subdomains just in case DNS catches them
+              const RESERVED = ['www', 'app', 'admin', 'api', 'mail', 'support'];
+              
+              if (subdomain && subdomain !== hostname && !RESERVED.includes(subdomain)) {
                   handlePublicAccess(subdomain, 'SUBDOMAIN');
               }
           } else {

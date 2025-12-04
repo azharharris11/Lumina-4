@@ -126,10 +126,15 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasChanges]);
 
-  // Updated Public URL Logic: Uses Subdomain if available
+  // Updated Public URL Logic: Uses Subdomain if available and correct environment
   const publicUrl = useMemo(() => {
+      const protocol = window.location.protocol;
+      const host = window.location.host;
+      const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1');
+      const rootDomain = isLocalhost ? host : 'luminaphotocrm.com';
+
       if (localSite.subdomain) {
-          return `https://${localSite.subdomain}.luminaphotocrm.com`;
+          return `${protocol}//${localSite.subdomain}.${rootDomain}`;
       }
       return `${window.location.origin}?site=${config.ownerId || 'me'}`;
   }, [localSite.subdomain, config.ownerId]);

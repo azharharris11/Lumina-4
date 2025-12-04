@@ -52,6 +52,9 @@ interface StudioContextType {
 
 const StudioContext = createContext<StudioContextType | undefined>(undefined);
 
+// Blacklist of reserved system subdomains
+const RESERVED_SUBDOMAINS = ['www', 'app', 'admin', 'api', 'mail', 'support', 'staging', 'test', 'login', 'signup', 'register'];
+
 export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser } = useAuth();
   
@@ -158,11 +161,19 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const updateConfig = async (newConfig: StudioConfig) => {
       if(!currentUser) return;
 
-      // VALIDASI SUBDOMAIN UNIK (CRITICAL LOGIC)
+      // VALIDASI SUBDOMAIN (CRITICAL LOGIC)
       if (newConfig.site.subdomain && newConfig.site.subdomain !== config.site.subdomain) {
+          const sub = newConfig.site.subdomain.toLowerCase();
+          
+          // 1. Cek Reserved Keywords
+          if (RESERVED_SUBDOMAINS.includes(sub)) {
+              throw new Error(`Subdomain '${sub}' is not allowed (System Reserved).`);
+          }
+
+          // 2. Cek Duplikasi di Database
           const q = query(
               collection(db, "studios"), 
-              where("site.subdomain", "==", newConfig.site.subdomain)
+              where("site.subdomain", "==", sub)
           );
           const snapshot = await getDocs(q);
           
@@ -170,7 +181,7 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           const isTaken = snapshot.docs.some(doc => doc.id !== currentUser.id);
           
           if (isTaken) {
-              throw new Error(`Subdomain '${newConfig.site.subdomain}' is already taken. Please choose another.`);
+              throw new Error(`Subdomain '${sub}' is already taken. Please choose another.`);
           }
       }
 
