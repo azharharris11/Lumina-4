@@ -7,6 +7,8 @@ import DashboardStats from '../components/dashboard/DashboardStats';
 import DashboardSchedule from '../components/dashboard/DashboardSchedule';
 import DashboardActionItems from '../components/dashboard/DashboardActionItems';
 
+const Motion = motion as any;
+
 const DashboardView: React.FC<DashboardProps> = ({ user, bookings, transactions = [], onSelectBooking, selectedDate, onNavigate, config, onOpenWhatsApp }) => {
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -93,7 +95,7 @@ const DashboardView: React.FC<DashboardProps> = ({ user, bookings, transactions 
   );
 
   return (
-    <motion.div 
+    <Motion.div 
       variants={containerVariants}
       initial="hidden"
       animate="visible"
@@ -114,7 +116,7 @@ const DashboardView: React.FC<DashboardProps> = ({ user, bookings, transactions 
 
       {/* ON-SET MODE CARD (Photographers Only) */}
       {activeShoot && (
-          <motion.div variants={itemVariants} className="bg-gradient-to-r from-blue-900/40 to-indigo-900/40 border border-blue-500/30 rounded-2xl p-6 relative overflow-hidden">
+          <Motion.div variants={itemVariants} className="bg-gradient-to-r from-blue-900/40 to-indigo-900/40 border border-blue-500/30 rounded-2xl p-6 relative overflow-hidden">
               <div className="absolute top-4 right-4 flex gap-2">
                   <span className="bg-blue-500 text-white text-[10px] font-bold px-3 py-1 rounded-full animate-pulse">LIVE SESSION</span>
               </div>
@@ -129,7 +131,7 @@ const DashboardView: React.FC<DashboardProps> = ({ user, bookings, transactions 
                       <CheckSquare size={18}/> Check Assets
                   </button>
               </div>
-          </motion.div>
+          </Motion.div>
       )}
 
       {/* Stats Grid */}
@@ -157,7 +159,7 @@ const DashboardView: React.FC<DashboardProps> = ({ user, bookings, transactions 
             itemVariants={itemVariants}
         />
       </div>
-    </motion.div>
+    </Motion.div>
   );
 };
 

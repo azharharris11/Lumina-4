@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import { X, Printer, Aperture } from 'lucide-react';
 import { Booking, StudioConfig } from '../types';
 
+const Motion = motion as any;
+
 interface InvoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -100,7 +102,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, booking, c
 
       <div className="absolute inset-0 bg-black/90 backdrop-blur-md no-print" onClick={onClose}></div>
       
-      <motion.div 
+      <Motion.div 
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
@@ -238,8 +240,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, booking, c
                 </div>
 
             </div>
-        </div>
-      </motion.div>
+        </Motion.div>
     </div>
   );
 };

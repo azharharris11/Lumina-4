@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { SiteBuilderViewProps, SitePage, SiteSection, SectionType, SiteTheme, SiteConfig, PublicBookingSubmission } from '../types';
-import { Globe, Smartphone, Monitor, PanelLeftOpen, Undo2, Redo2 } from 'lucide-react';
+import { Globe, Smartphone, Monitor, PanelLeftOpen, Undo2, Redo2, Loader2 } from 'lucide-react';
 import SitePreviewFrame from '../components/site-builder/SitePreviewFrame';
 import SiteBuilderSidebar from '../components/site-builder/SiteBuilderSidebar';
 
@@ -20,9 +20,12 @@ import ImpactTheme from '../components/site-builder/themes/ImpactTheme';
 import CleanSlateTheme from '../components/site-builder/themes/CleanSlateTheme';
 import AuthorityTheme from '../components/site-builder/themes/AuthorityTheme';
 
+const Motion = motion as any;
+
 interface ExtendedSiteBuilderViewProps extends SiteBuilderViewProps {
     onExit?: () => void;
     onPublicBooking?: (data: PublicBookingSubmission) => void;
+    onUpdateConfig: (config: any) => Promise<void>; // Updated to return Promise
 }
 
 const THEMES: {id: SiteTheme, label: string, color: string, textColor: string}[] = [
@@ -55,6 +58,7 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
   
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isSaving, setIsSaving] = useState(false);
 
   const hasChanges = useMemo(() => {
       return JSON.stringify(localSite) !== JSON.stringify(config.site);
@@ -78,6 +82,20 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
   const handleRedo = useCallback(() => {
       if (canRedo) setHistoryIndex(prev => prev + 1);
   }, [canRedo]);
+
+  // WRAPPED SAVE FUNCTION
+  const handleSave = async () => {
+      if (isSaving) return;
+      setIsSaving(true);
+      try {
+          await onUpdateConfig({ ...config, site: localSite });
+          // Success handled via context/refresh usually, but we clear saving flag
+      } catch (e: any) {
+          alert(e.message || "Failed to save site configuration.");
+      } finally {
+          setIsSaving(false);
+      }
+  };
 
   useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
@@ -269,7 +287,7 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
             hasChanges={hasChanges}
             themes={THEMES}
             onExit={() => onExit && onExit()}
-            onSave={() => onUpdateConfig({ ...config, site: localSite })}
+            onSave={handleSave}
             handleGlobalChange={handleGlobalChange}
             handleContentChange={handleContentChange}
             handleAddSection={handleAddSection}
@@ -308,7 +326,8 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
                     <div className="h-4 w-px bg-lumina-highlight"></div>
                     {hasChanges ? (
                         <span className="flex items-center gap-2 text-xs font-bold text-lumina-muted cursor-not-allowed">
-                            <Globe size={14}/> Save to View Live
+                            {isSaving ? <Loader2 size={14} className="animate-spin"/> : <Globe size={14}/>} 
+                            {isSaving ? 'Saving...' : 'Save to View Live'}
                         </span>
                     ) : (
                         <a 
@@ -328,7 +347,7 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
             </div>
 
             <div className="flex-1 overflow-hidden relative flex items-center justify-center bg-[#0a0a0a] p-8">
-                <motion.div 
+                <Motion.div 
                     layout
                     className={`bg-white shadow-2xl transition-all duration-500 overflow-hidden relative border-black
                         ${previewMode === 'MOBILE' 
@@ -352,7 +371,7 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
                     <SitePreviewFrame className="w-full h-full bg-white" siteConfig={localSite}>
                         {renderTheme()}
                     </SitePreviewFrame>
-                </motion.div>
+                </Motion.div>
             </div>
         </div>
     </div>

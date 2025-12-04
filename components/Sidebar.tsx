@@ -19,6 +19,8 @@ import {
 import { SidebarProps } from '../types'; // Updated import
 import { motion } from 'framer-motion';
 
+const Motion = motion as any;
+
 const Sidebar: React.FC<SidebarProps> = ({ currentUser, onNavigate, currentView, onLogout, onSwitchApp, isDarkMode, onToggleTheme, bookings }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['OWNER', 'ADMIN', 'PHOTOGRAPHER', 'EDITOR', 'FINANCE'] },
@@ -56,7 +58,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentUser, onNavigate, currentView,
   };
 
   return (
-    <motion.aside 
+    <Motion.aside 
       initial={{ x: -20, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       className="hidden lg:flex w-64 h-screen bg-lumina-surface border-r border-lumina-highlight flex-col justify-between fixed left-0 top-0 z-50 transition-all duration-300 shadow-xl"
@@ -104,7 +106,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentUser, onNavigate, currentView,
               </div>
               <span className="ml-3 font-medium tracking-wide text-sm">{item.label}</span>
               {currentView === item.id && (
-                <motion.div 
+                <Motion.div 
                   layoutId="activeIndicator"
                   className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-lumina-accent rounded-r-full" 
                 />
@@ -149,7 +151,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentUser, onNavigate, currentView,
           <span className="ml-2 text-xs font-semibold uppercase tracking-widest">Logout</span>
         </button>
       </div>
-    </motion.aside>
+    </Motion.aside>
   );
 };
 

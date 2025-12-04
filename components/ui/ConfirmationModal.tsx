@@ -3,6 +3,8 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, Check } from 'lucide-react';
 
+const Motion = motion as any;
+
 interface ConfirmationModalProps {
     isOpen: boolean;
     title: string;
@@ -22,11 +24,11 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     return (
         <AnimatePresence>
             <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
-                <motion.div 
+                <Motion.div 
                     initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                     onClick={onCancel} className="absolute inset-0 bg-black/80 backdrop-blur-sm"
                 />
-                <motion.div 
+                <Motion.div 
                     initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
                     className="relative bg-lumina-surface border border-lumina-highlight w-full max-w-sm rounded-2xl p-6 shadow-2xl"
                     role="alertdialog"
@@ -57,7 +59,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                             </button>
                         </div>
                     </div>
-                </motion.div>
+                </Motion.div>
             </div>
         </AnimatePresence>
     );

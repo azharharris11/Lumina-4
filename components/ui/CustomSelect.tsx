@@ -3,6 +3,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, Check } from 'lucide-react';
 
+const Motion = motion as any;
+
 interface Option {
     value: string;
     label: string;
@@ -54,7 +56,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, options, p
 
             <AnimatePresence>
                 {isOpen && (
-                    <motion.div
+                    <Motion.div
                         initial={{ opacity: 0, y: 5, scale: 0.98 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 5, scale: 0.98 }}
@@ -85,7 +87,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, options, p
                                 <div className="p-3 text-center text-xs text-lumina-muted">No options available</div>
                             )}
                         </div>
-                    </motion.div>
+                    </Motion.div>
                 )}
             </AnimatePresence>
         </div>

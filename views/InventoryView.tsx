@@ -7,6 +7,8 @@ import InventoryAssetCard from '../components/inventory/InventoryAssetCard';
 import InventoryActionModal from '../components/inventory/InventoryActionModal';
 import InventoryAddModal from '../components/inventory/InventoryAddModal';
 
+const Motion = motion as any;
+
 const InventoryView: React.FC<InventoryViewProps> = ({ assets, users, onAddAsset, onUpdateAsset, onDeleteAsset, config }) => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string>('ALL');
@@ -156,7 +158,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({ assets, users, onAddAsset
                  className={`px-6 py-3 font-bold text-sm transition-colors relative whitespace-nowrap ${activeCategory === cat.id ? 'text-white' : 'text-lumina-muted hover:text-white'}`}
               >
                   {cat.label}
-                  {activeCategory === cat.id && <motion.div layoutId="invTab" className="absolute bottom-0 left-0 w-full h-0.5 bg-lumina-accent" />}
+                  {activeCategory === cat.id && <Motion.div layoutId="invTab" className="absolute bottom-0 left-0 w-full h-0.5 bg-lumina-accent" />}
               </button>
           ))}
       </div>

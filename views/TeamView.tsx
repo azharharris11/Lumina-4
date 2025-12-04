@@ -9,6 +9,8 @@ import TeamAvailabilityModal from '../components/team/TeamAvailabilityModal';
 import ConfirmationModal from '../components/ui/ConfirmationModal';
 import { useStudio } from '../contexts/StudioContext'; // Use hook directly for cleaner prop drilling if preferred, but prop is cleaner for structure
 
+const Motion = motion as any;
+
 const TeamView: React.FC<TeamViewProps> = ({ users, bookings, onAddUser, onUpdateUser, onDeleteUser, onRecordExpense }) => {
   const { transactions } = useStudio(); // Access transactions here
   
@@ -216,8 +218,8 @@ const TeamView: React.FC<TeamViewProps> = ({ users, bookings, onAddUser, onUpdat
       <AnimatePresence>
           {viewScheduleUser && (
               <>
-                 <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={() => setViewScheduleUser(null)} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]" />
-                 <motion.div 
+                 <Motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={() => setViewScheduleUser(null)} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]" />
+                 <Motion.div 
                     initial={{x: '100%'}} animate={{x:0}} exit={{x: '100%'}} 
                     className="fixed top-0 right-0 h-full w-96 bg-lumina-surface border-l border-lumina-highlight z-[110] p-6 shadow-2xl flex flex-col"
                  >
@@ -246,7 +248,7 @@ const TeamView: React.FC<TeamViewProps> = ({ users, bookings, onAddUser, onUpdat
                              ))
                          )}
                      </div>
-                 </motion.div>
+                 </Motion.div>
               </>
           )}
       </AnimatePresence>

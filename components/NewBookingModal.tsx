@@ -6,6 +6,8 @@ import { PACKAGES } from '../data';
 import { X, Search, ChevronRight, ChevronLeft, Calendar, Clock, User as UserIcon, CheckCircle2, AlertCircle, Plus, DollarSign, Briefcase, Loader2, Save, Camera } from 'lucide-react';
 import CustomSelect from './ui/CustomSelect';
 
+const Motion = motion as any;
+
 interface NewBookingModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -293,7 +295,7 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 lg:p-0">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={isSubmitting ? undefined : onClose}></div>
       
-      <motion.div 
+      <Motion.div 
         initial={{ scale: 0.95, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.95, opacity: 0, y: 20 }}
@@ -363,7 +365,7 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
                     
                     {/* STEP 1: CLIENT */}
                     {step === 1 && (
-                        <motion.div key="step1" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-6">
+                        <Motion.div key="step1" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-6">
                             <h2 className="text-2xl font-bold text-white">Select Client</h2>
                             {!isCreatingClient ? (
                                 <>
@@ -407,12 +409,12 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
                                     <button onClick={handleCreateClient} className="w-full py-3 bg-lumina-accent text-lumina-base font-bold rounded-xl hover:bg-lumina-accent/90 transition-colors">Save Client</button>
                                 </div>
                             )}
-                        </motion.div>
+                        </Motion.div>
                     )}
 
                     {/* STEP 2: SESSION */}
                     {step === 2 && (
-                        <motion.div key="step2" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-6">
+                        <Motion.div key="step2" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-6">
                             <h2 className="text-2xl font-bold text-white">Session Details</h2>
                             <div className="space-y-4">
                                 <div>
@@ -470,14 +472,14 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
                                         
                                         {/* CONFLICT ERROR DISPLAY */}
                                         {conflictError && (
-                                            <motion.div 
+                                            <Motion.div 
                                                 initial={{ opacity: 0, y: -10 }} 
                                                 animate={{ opacity: 1, y: 0 }}
                                                 className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-lg flex items-start gap-2"
                                             >
                                                 <AlertCircle className="text-rose-500 w-4 h-4 mt-0.5 shrink-0" />
                                                 <span className="text-xs text-rose-400 font-bold">{conflictError}</span>
-                                            </motion.div>
+                                            </Motion.div>
                                         )}
                                     </div>
 
@@ -498,12 +500,12 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
                                     </div>
                                 </div>
                             </div>
-                        </motion.div>
+                        </Motion.div>
                     )}
 
                     {/* STEP 3: PAYMENT */}
                     {step === 3 && (
-                        <motion.div key="step3" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-6">
+                        <Motion.div key="step3" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="space-y-6">
                             <h2 className="text-2xl font-bold text-white">Payment & Confirmation</h2>
                             <div className="bg-white text-black rounded-xl overflow-hidden shadow-2xl max-w-md mx-auto relative">
                                 <div className="h-2 bg-lumina-accent w-full"></div>
@@ -531,7 +533,7 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
                                     <div className="mt-4 flex items-center gap-2"><input type="checkbox" id="googleSync" checked={bookingForm.syncGoogle} disabled={!googleToken} onChange={(e) => setBookingForm({...bookingForm, syncGoogle: e.target.checked})} className="rounded border-gray-300 text-emerald-500 focus:ring-emerald-500"/><label htmlFor="googleSync" className={`text-xs font-bold uppercase ${googleToken ? 'text-gray-600' : 'text-gray-400'}`}>Sync to Google Calendar {googleToken ? '' : '(Not Connected)'}</label></div>
                                 </div>
                             </div>
-                        </motion.div>
+                        </Motion.div>
                     )}
                 </AnimatePresence>
             </div>
@@ -543,7 +545,7 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
                 </button>
             </div>
         </div>
-      </motion.div>
+      </Motion.div>
     </div>
   );
 };

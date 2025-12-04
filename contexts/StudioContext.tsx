@@ -157,6 +157,23 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const updateConfig = async (newConfig: StudioConfig) => {
       if(!currentUser) return;
+
+      // VALIDASI SUBDOMAIN UNIK (CRITICAL LOGIC)
+      if (newConfig.site.subdomain && newConfig.site.subdomain !== config.site.subdomain) {
+          const q = query(
+              collection(db, "studios"), 
+              where("site.subdomain", "==", newConfig.site.subdomain)
+          );
+          const snapshot = await getDocs(q);
+          
+          // Jika ada dokumen lain yang menggunakan subdomain ini
+          const isTaken = snapshot.docs.some(doc => doc.id !== currentUser.id);
+          
+          if (isTaken) {
+              throw new Error(`Subdomain '${newConfig.site.subdomain}' is already taken. Please choose another.`);
+          }
+      }
+
       await setDoc(doc(db, "studios", currentUser.id), newConfig);
       setConfig(newConfig);
   };

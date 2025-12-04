@@ -31,6 +31,8 @@ import { useStudio } from './contexts/StudioContext';
 import { doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore'; 
 import { db } from './firebase';
 
+const Motion = motion as any;
+
 const VIEW_PERMISSIONS: Record<string, Role[]> = {
     'dashboard': ['OWNER', 'ADMIN', 'PHOTOGRAPHER', 'EDITOR', 'FINANCE'],
     'calendar': ['OWNER', 'ADMIN', 'PHOTOGRAPHER'],
@@ -106,19 +108,24 @@ const App: React.FC = () => {
       const publicSiteId = params.get('site');
       const portalBookingId = params.get('booking');
 
-      // Define your main domains here (Production + Localhost)
-      const MAIN_DOMAINS = [
+      // Define main domains to prevent loops
+      // NOTE: luminaphotocrm.com is the root.
+      const ROOT_DOMAIN = 'luminaphotocrm.com';
+      const APP_DOMAINS = [
           'localhost', 
           '127.0.0.1',
-          'luminaphotocrm.com', 
-          'www.luminaphotocrm.com', 
-          'app.luminaphotocrm.com', // Cloudflare Worker / App Domain
-          'studio-manager-lumina-2911-15-53-276331844787.us-west1.run.app' // Google Cloud Run
+          ROOT_DOMAIN,
+          `www.${ROOT_DOMAIN}`, 
+          `app.${ROOT_DOMAIN}`,
+          'studio-manager-lumina-2911-15-53-276331844787.us-west1.run.app' // Cloud Run
       ];
       
-      const isMainDomain = MAIN_DOMAINS.includes(hostname);
+      const isMainApp = APP_DOMAINS.includes(hostname);
 
       const handlePublicAccess = async (identifier: string, method: 'ID' | 'SUBDOMAIN' | 'CUSTOM_DOMAIN') => {
+          // If we are already logged in as the owner of this site, we might still want to see the public view
+          // OR we might want to edit. For now, we force Public View if it's a subdomain.
+          
           setViewMode('PUBLIC');
           setIsPublicLoading(true);
           setPublicError(null);
@@ -170,20 +177,21 @@ const App: React.FC = () => {
       if (publicSiteId) {
           // Priority 1: Explicit Query Param (e.g. ?site=user123)
           handlePublicAccess(publicSiteId, 'ID');
-      } else if (isMainDomain) {
-          // Priority 2: Main Domain -> Do nothing, stay on App/Landing
-          // This prevents "Studio Not Found" on the main landing page
-      } else if (hostname.endsWith('luminaphotocrm.com')) {
-          // Priority 3: Subdomain (e.g. test.luminaphotocrm.com)
-          const subdomain = hostname.replace('.luminaphotocrm.com', '');
-          // app.luminaphotocrm.com is handled in MAIN_DOMAINS above, so here we check for others
-          if (subdomain && subdomain !== 'www' && subdomain !== 'app') {
-              handlePublicAccess(subdomain, 'SUBDOMAIN');
-          }
+      } else if (isMainApp) {
+          // Priority 2: Main App Domain -> Do nothing, standard routing
       } else {
-          // Priority 4: Custom Domain (e.g. www.mystudio.com)
-          // If it's not a main domain and not a subdomain, it must be a custom domain
-          handlePublicAccess(hostname, 'CUSTOM_DOMAIN');
+          // Priority 3: Subdomain or Custom Domain
+          if (hostname.endsWith(ROOT_DOMAIN)) {
+              // It's a subdomain like "ammora.luminaphotocrm.com"
+              const subdomain = hostname.replace(`.${ROOT_DOMAIN}`, '');
+              // Filter out known subdomains that point to main app
+              if (subdomain !== 'www' && subdomain !== 'app') {
+                  handlePublicAccess(subdomain, 'SUBDOMAIN');
+              }
+          } else {
+              // It's a completely different domain (e.g. "mystudio.com")
+              handlePublicAccess(hostname, 'CUSTOM_DOMAIN');
+          }
       }
 
   }, []);
@@ -266,9 +274,9 @@ const App: React.FC = () => {
       <main className="flex-1 flex flex-col h-screen relative overflow-hidden lg:ml-64">
           <div className="flex-1 overflow-y-auto p-4 lg:p-8 pb-24 lg:pb-8 custom-scrollbar relative z-0" id="main-content">
               <AnimatePresence mode="wait">
-                  <motion.div key={currentView} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }} className="h-full">
+                  <Motion.div key={currentView} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }} className="h-full">
                       {renderView()}
-                  </motion.div>
+                  </Motion.div>
               </AnimatePresence>
           </div>
           {isMobile && <MobileNav currentUser={currentUser} onNavigate={setCurrentView} currentView={currentView} onLogout={logout} bookings={bookings} />}

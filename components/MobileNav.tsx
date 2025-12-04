@@ -4,6 +4,8 @@ import { LayoutDashboard, CalendarDays, Box, Users, Menu, X, Wallet, Layers, Set
 import { motion, AnimatePresence } from 'framer-motion';
 import { SidebarProps } from '../types';
 
+const Motion = motion as any;
+
 interface MobileNavProps extends SidebarProps {
   // Inherits props like onNavigate, currentView, etc.
 }
@@ -51,7 +53,7 @@ const MobileNav: React.FC<MobileNavProps> = ({ onNavigate, currentView, bookings
               >
                 <item.icon size={22} strokeWidth={isActive ? 2.5 : 2} />
                 <span className="text-[10px] font-bold tracking-wide">{item.label}</span>
-                {isActive && <motion.div layoutId="mobileNavIndicator" className="absolute bottom-0 w-8 h-1 bg-lumina-accent rounded-t-full" />}
+                {isActive && <Motion.div layoutId="mobileNavIndicator" className="absolute bottom-0 w-8 h-1 bg-lumina-accent rounded-t-full" />}
               </button>
             )
           })}
@@ -71,7 +73,7 @@ const MobileNav: React.FC<MobileNavProps> = ({ onNavigate, currentView, bookings
       {/* Full Screen More Menu - Solid Background */}
       <AnimatePresence>
         {isMenuOpen && (
-          <motion.div 
+          <Motion.div 
             initial={{ opacity: 0, y: '100%' }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: '100%' }}
@@ -112,7 +114,7 @@ const MobileNav: React.FC<MobileNavProps> = ({ onNavigate, currentView, bookings
                  Log Out
                </button>
             </div>
-          </motion.div>
+          </Motion.div>
         )}
       </AnimatePresence>
     </>

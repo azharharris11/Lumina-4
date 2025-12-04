@@ -5,6 +5,8 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Booking, Package, Transaction, User, AnalyticsViewProps } from '../types';
 import { TrendingUp, Clock, Target, CalendarCheck, DollarSign, TrendingDown, FileText, Printer, ArrowRight, Users, Briefcase, Percent } from 'lucide-react';
 
+const Motion = motion as any;
+
 const AnalyticsView: React.FC<AnalyticsViewProps> = ({ bookings, packages, transactions = [], users = [] }) => {
   const [viewMode, setViewMode] = useState<'DASHBOARD' | 'SHAREHOLDER'>('DASHBOARD');
   const [timeRange, setTimeRange] = useState<'MONTH' | 'QUARTER' | 'YEAR'>('MONTH');
@@ -177,7 +179,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ bookings, packages, trans
   };
 
   return (
-    <motion.div 
+    <Motion.div 
         initial={{ opacity: 0, y: 10 }} 
         animate={{ opacity: 1, y: 0 }} 
         className="space-y-8 h-full flex flex-col"
@@ -228,7 +230,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ bookings, packages, trans
 
        {/* ==================== DASHBOARD MODE ==================== */}
        {viewMode === 'DASHBOARD' && (
-           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
+           <Motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
                {/* KPIs */}
                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                    <div className="p-6 bg-lumina-surface border border-lumina-highlight rounded-2xl">
@@ -312,12 +314,12 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ bookings, packages, trans
                        </div>
                    </div>
                </div>
-           </motion.div>
+           </Motion.div>
        )}
 
        {/* ==================== SHAREHOLDER REPORT MODE ==================== */}
        {viewMode === 'SHAREHOLDER' && (
-           <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="space-y-8 pb-20 print:pb-0 print:space-y-6">
+           <Motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="space-y-8 pb-20 print:pb-0 print:space-y-6">
                {/* 1. EXECUTIVE SUMMARY */}
                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 print:grid-cols-4">
                    <div className="bg-emerald-500/10 border border-emerald-500/30 p-6 rounded-xl print:border-black print:bg-white">
@@ -474,9 +476,9 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ bookings, packages, trans
                    </div>
                </div>
 
-           </motion.div>
+           </Motion.div>
        )}
-    </motion.div>
+    </Motion.div>
   );
 };
 

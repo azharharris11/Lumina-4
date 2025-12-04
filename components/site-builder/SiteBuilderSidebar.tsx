@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { 
@@ -8,6 +9,8 @@ import {
 import { SiteConfig, SiteTheme, SitePage, SiteSection } from '../../types';
 import SiteSectionEditor, { DebouncedInput, DebouncedTextarea, ImageUploader } from './SiteSectionEditor';
 import ToggleRow from './ToggleRow';
+
+const Motion = motion as any;
 
 interface SiteBuilderSidebarProps {
     isSidebarOpen: boolean;
@@ -218,7 +221,7 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = ({
                                             
                                             <AnimatePresence>
                                                 {selectedSectionId === section.id && (
-                                                    <motion.div 
+                                                    <Motion.div 
                                                         initial={{ height: 0, opacity: 0 }} 
                                                         animate={{ height: 'auto', opacity: 1 }} 
                                                         exit={{ height: 0, opacity: 0 }}
@@ -229,7 +232,7 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = ({
                                                             onUpdate={handleUpdateSection} 
                                                             onDelete={handleDeleteSection} 
                                                         />
-                                                    </motion.div>
+                                                    </Motion.div>
                                                 )}
                                             </AnimatePresence>
                                         </div>
@@ -410,13 +413,18 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = ({
                                     <div className="flex items-center bg-[#1a1a1a] border border-[#333] rounded overflow-hidden">
                                         <input 
                                             value={localSite.subdomain}
-                                            onChange={e => handleGlobalChange('subdomain', e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                                            onChange={e => {
+                                                // Stricter Regex: Alphanumeric only, no special chars, no spaces.
+                                                // Leading/Trailing hyphens are handled/prevented on Save, but here we just prevent bad chars.
+                                                const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                                                handleGlobalChange('subdomain', val);
+                                            }}
                                             className="bg-transparent p-2 text-sm text-white outline-none flex-1"
                                             placeholder="your-studio"
                                         />
                                         <span className="text-xs text-gray-500 px-2 bg-[#252525] border-l border-[#333] h-full flex items-center">.luminaphotocrm.com</span>
                                     </div>
-                                    <p className="text-[10px] text-gray-500 mt-1">Default address for your site.</p>
+                                    <p className="text-[10px] text-gray-500 mt-1">Default address for your site. Must be unique.</p>
                                 </div>
 
                                 <div className="h-px bg-[#333] w-full"></div>
@@ -433,32 +441,32 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = ({
                                 </div>
                                 
                                 {/* Simple Guide */}
-                                <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                                    <h4 className="text-xs font-bold text-blue-200 mb-2 flex items-center gap-2"><Info size={12}/> How to connect your domain</h4>
+                                <div className="mt-4 p-3 bg-blue-900/20 border border-blue-800 rounded">
+                                    <h4 className="text-xs font-bold text-blue-200 mb-2 flex items-center gap-2"><Info size={12}/> Connection Guide</h4>
                                     
                                     <p className="text-[10px] text-gray-300 mb-3 leading-relaxed">
-                                        Login to your domain provider (GoDaddy, Namecheap, Niagahoster, etc.) and add this record:
+                                        To use your own domain (e.g. Namecheap, GoDaddy), login to your provider and add a <strong>CNAME Record</strong>:
                                     </p>
 
-                                    <div className="bg-black/40 p-2 rounded border border-blue-500/20 text-[10px] space-y-2 font-mono text-gray-300">
-                                        <div className="flex justify-between border-b border-white/5 pb-1">
-                                            <span className="text-gray-500">Record Type</span>
-                                            <span className="text-white font-bold">CNAME</span>
+                                    <div className="bg-black/50 p-2 rounded border border-blue-900/50 text-[10px] space-y-1.5 font-mono text-gray-300">
+                                        <div className="flex justify-between items-center border-b border-white/10 pb-1">
+                                            <span className="text-gray-500">Type</span>
+                                            <span className="text-white font-bold bg-blue-900/50 px-1.5 rounded">CNAME</span>
                                         </div>
-                                        <div className="flex justify-between border-b border-white/5 pb-1">
-                                            <span className="text-gray-500">Host / Name</span>
+                                        <div className="flex justify-between items-center border-b border-white/10 pb-1">
+                                            <span className="text-gray-500">Host</span>
                                             <span className="text-white font-bold">www</span>
                                         </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-gray-500">Value / Target</span>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-gray-500">Value</span>
                                             <span className="text-emerald-400 font-bold select-all">app.luminaphotocrm.com</span>
                                         </div>
                                     </div>
 
                                     <div className="mt-3 flex gap-2 items-start">
-                                        <CheckCircle2 size={12} className="text-emerald-500 mt-0.5 shrink-0" />
+                                        <AlertCircle size={12} className="text-amber-500 mt-0.5 shrink-0" />
                                         <p className="text-[10px] text-gray-400 leading-tight">
-                                            Save the record in your provider. It may take up to 24 hours to work globally.
+                                            <strong>Note on SSL:</strong> Adding CNAME alone might cause SSL errors. Your provider must support CNAME flattening or you may need to use Cloudflare for SSL provisioning.
                                         </p>
                                     </div>
                                 </div>

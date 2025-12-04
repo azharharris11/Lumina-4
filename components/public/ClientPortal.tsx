@@ -7,6 +7,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase';
 
+const Motion = motion as any;
+
 interface ClientPortalProps {
     booking: Booking;
     config: StudioConfig;
@@ -158,7 +160,7 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking, config }) => {
                 
                 {/* --- DASHBOARD TAB --- */}
                 {activeTab === 'DASHBOARD' && (
-                    <motion.div initial={{opacity: 0, y: 10}} animate={{opacity: 1, y: 0}} className="space-y-8">
+                    <Motion.div initial={{opacity: 0, y: 10}} animate={{opacity: 1, y: 0}} className="space-y-8">
                         <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 md:p-8 overflow-x-auto">
                             <h3 className="text-sm font-bold text-neutral-500 uppercase tracking-widest mb-8">Project Timeline</h3>
                             <div className="flex items-center min-w-[600px]">
@@ -216,12 +218,12 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking, config }) => {
                                 </a>
                             </div>
                         </div>
-                    </motion.div>
+                    </Motion.div>
                 )}
 
                 {/* --- GALLERY TAB --- */}
                 {activeTab === 'GALLERY' && (
-                    <motion.div initial={{opacity: 0}} animate={{opacity: 1}}>
+                    <Motion.div initial={{opacity: 0}} animate={{opacity: 1}}>
                         <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 md:p-8 mb-8 text-center">
                             <h2 className="text-2xl font-bold text-white mb-2">Original Files</h2>
                             <p className="text-neutral-400 mb-6 max-w-lg mx-auto text-sm">
@@ -279,12 +281,12 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking, config }) => {
                                 ))}
                             </div>
                         )}
-                    </motion.div>
+                    </Motion.div>
                 )}
 
                 {/* --- SELECTED TAB --- */}
                 {activeTab === 'SELECTED' && (
-                    <motion.div initial={{opacity: 0}} animate={{opacity: 1}}>
+                    <Motion.div initial={{opacity: 0}} animate={{opacity: 1}}>
                         <div className="flex justify-between items-center mb-6">
                             <div>
                                 <h2 className="text-2xl font-bold text-white">Your Selection</h2>
@@ -331,7 +333,7 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking, config }) => {
                                 ))}
                             </div>
                         )}
-                    </motion.div>
+                    </Motion.div>
                 )}
 
             </main>

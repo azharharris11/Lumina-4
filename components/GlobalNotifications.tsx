@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Notification } from '../types';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 
+const Motion = motion as any;
+
 interface GlobalNotificationsProps {
     notifications: Notification[];
     onDismiss: (id: string) => void;
@@ -14,7 +16,7 @@ const GlobalNotifications: React.FC<GlobalNotificationsProps> = ({ notifications
         <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 w-full max-w-sm pointer-events-none px-4 md:px-0">
             <AnimatePresence mode="popLayout">
                 {notifications.map((notif) => (
-                    <motion.div
+                    <Motion.div
                         key={notif.id}
                         layout
                         initial={{ opacity: 0, y: -20, scale: 0.9 }}
@@ -51,7 +53,7 @@ const GlobalNotifications: React.FC<GlobalNotificationsProps> = ({ notifications
                         >
                             <X size={14} />
                         </button>
-                    </motion.div>
+                    </Motion.div>
                 ))}
             </AnimatePresence>
         </div>
