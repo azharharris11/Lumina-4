@@ -133,14 +133,14 @@ export const createBooking = onCall({
       let accountRef;
       if (paymentDetails && paymentDetails.amount > 0) {
         if (!paymentDetails.accountId) {
-             throw new HttpsError("invalid-argument", "Payment amount provided but missing Account ID.");
+          throw new HttpsError("invalid-argument", "Payment amount provided but missing Account ID.");
         }
         accountRef = db.collection("accounts").doc(paymentDetails.accountId);
         accountDoc = await transaction.get(accountRef);
-        
+
         // Auto-update status to BOOKED if payment is made
-        if (newBooking.status === 'INQUIRY') {
-            newBooking.status = 'BOOKED';
+        if (newBooking.status === "INQUIRY") {
+          newBooking.status = "BOOKED";
         }
         newBooking.paidAmount = paymentDetails.amount;
       }
