@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { SiteSection } from '../../types';
-import { Trash2, Video, MousePointerClick, Upload, Loader2, Image as ImageIcon } from 'lucide-react';
+import { Trash2, Video, MousePointerClick, Upload, Loader2, Image as ImageIcon, ExternalLink } from 'lucide-react';
 import { uploadFile } from '../../utils/storageUtils';
+import MediaLibraryModal from './MediaLibraryModal';
 
 // Helper Components
 export const DebouncedInput = ({ value, onChange, className, placeholder, type = 'text', ...props }: any) => {
@@ -64,43 +65,43 @@ export const DebouncedTextarea = ({ value, onChange, className, placeholder, ...
 };
 
 export const ImageUploader = ({ value, onChange, className }: any) => {
-    const [isUploading, setIsUploading] = useState(false);
-
-    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            setIsUploading(true);
-            try {
-                const url = await uploadFile(e.target.files[0], 'site-assets');
-                onChange(url);
-            } catch (err) {
-                alert("Upload failed.");
-            } finally {
-                setIsUploading(false);
-            }
-        }
-    };
+    const [isLibraryOpen, setIsLibraryOpen] = useState(false);
 
     return (
-        <div className="flex gap-2 items-center">
-            <DebouncedInput 
-                value={value || ''}
-                onChange={onChange}
-                className={className}
-                placeholder="Image URL..."
-            />
-            <label className="p-2 bg-lumina-surface border border-lumina-highlight rounded-lg hover:bg-lumina-highlight cursor-pointer text-white transition-colors">
-                {isUploading ? <Loader2 size={16} className="animate-spin"/> : <Upload size={16}/>}
-                <input type="file" className="hidden" accept="image/*" onChange={handleUpload} disabled={isUploading} />
-            </label>
-            {value && (
-                <div className="w-9 h-9 rounded overflow-hidden border border-lumina-highlight shrink-0 bg-black relative group">
-                    <img src={value} className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <ImageIcon size={12} className="text-white"/>
+        <>
+            <div className="flex gap-2 items-center">
+                <DebouncedInput 
+                    value={value || ''}
+                    onChange={onChange}
+                    className={className}
+                    placeholder="Image URL..."
+                />
+                <button 
+                    onClick={() => setIsLibraryOpen(true)}
+                    className="p-2 bg-lumina-surface border border-lumina-highlight rounded-lg hover:bg-lumina-highlight cursor-pointer text-white transition-colors"
+                    title="Open Media Library"
+                >
+                    <ImageIcon size={16}/>
+                </button>
+                {value && (
+                    <div className="w-9 h-9 rounded overflow-hidden border border-lumina-highlight shrink-0 bg-black relative group cursor-pointer" onClick={() => window.open(value, '_blank')}>
+                        <img src={value} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <ExternalLink size={12} className="text-white"/>
+                        </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )}
+            </div>
+            
+            <MediaLibraryModal 
+                isOpen={isLibraryOpen} 
+                onClose={() => setIsLibraryOpen(false)} 
+                onSelect={(url) => {
+                    onChange(url);
+                    setIsLibraryOpen(false);
+                }} 
+            />
+        </>
     );
 }
 
@@ -162,6 +163,30 @@ const SiteSectionEditor: React.FC<SiteSectionEditorProps> = ({ section, onUpdate
                     />
                 </div>
             )}
+
+            {section.type === 'VIDEO_EMBED' && (
+                <div>
+                    <label className="text-[10px] text-lumina-muted uppercase block mb-1 font-bold flex items-center gap-1"><Video size={10}/> YouTube / Vimeo URL</label>
+                    <DebouncedInput 
+                        placeholder="https://youtube.com/watch?v=..."
+                        value={section.content.videoUrl || ''}
+                        onChange={(val: string) => onUpdate(section.id, { videoUrl: val })}
+                        className="w-full bg-lumina-surface border border-lumina-highlight rounded-lg p-2 text-xs text-white focus:border-lumina-accent outline-none"
+                    />
+                </div>
+            )}
+
+            {section.type === 'RICH_TEXT' && (
+                <div>
+                    <label className="text-[10px] text-lumina-muted uppercase block mb-1 font-bold">HTML Content</label>
+                    <DebouncedTextarea 
+                        value={section.content.html || ''}
+                        onChange={(val: string) => onUpdate(section.id, { html: val })}
+                        className="w-full bg-lumina-surface border border-lumina-highlight rounded-lg p-2 text-xs text-white focus:border-lumina-accent outline-none font-mono min-h-[150px]"
+                        placeholder="<p>Write your custom HTML here...</p>"
+                    />
+                </div>
+            )}
             
             {section.type === 'TEXT_IMAGE' && (
                 <div>
@@ -180,38 +205,61 @@ const SiteSectionEditor: React.FC<SiteSectionEditorProps> = ({ section, onUpdate
                 </div>
             )}
             
-            {section.type === 'FEATURES' && (
+            {(section.type === 'FEATURES' || section.type === 'TEAM_GRID') && (
                 <div>
-                    <label className="text-[10px] text-lumina-muted uppercase block mb-1 font-bold">Features List</label>
+                    <label className="text-[10px] text-lumina-muted uppercase block mb-1 font-bold">{section.type === 'TEAM_GRID' ? 'Manual Team Members (Leave empty to use System Team)' : 'Features List'}</label>
                     {section.content.items?.map((item, idx) => (
                         <div key={idx} className="mb-2 pb-2 border-b border-lumina-highlight/50 last:border-0">
-                            <input 
-                                value={item.title} 
-                                onChange={(e) => {
+                            <div className="flex gap-2 mb-1">
+                                <div className="w-8 h-8 bg-gray-800 rounded overflow-hidden shrink-0">
+                                   {item.image ? <img src={item.image} className="w-full h-full object-cover"/> : <div className="w-full h-full bg-gray-700"/>}
+                                </div>
+                                <div className="flex-1">
+                                    <input 
+                                        value={item.title} 
+                                        onChange={(e) => {
+                                            const newItems = [...(section.content.items || [])];
+                                            newItems[idx].title = e.target.value;
+                                            onUpdate(section.id, { items: newItems });
+                                        }}
+                                        className="w-full bg-transparent border-none p-1 text-xs text-white font-bold placeholder-gray-600 focus:ring-0"
+                                        placeholder={section.type === 'TEAM_GRID' ? "Name" : "Title"}
+                                    />
+                                </div>
+                                <button onClick={() => {
                                     const newItems = [...(section.content.items || [])];
-                                    newItems[idx].title = e.target.value;
+                                    newItems.splice(idx, 1);
                                     onUpdate(section.id, { items: newItems });
-                                }}
-                                className="w-full bg-transparent border-none p-1 text-xs text-white font-bold placeholder-gray-600 focus:ring-0"
-                                placeholder="Title"
-                            />
-                            <textarea 
+                                }} className="text-gray-500 hover:text-rose-500"><Trash2 size={12}/></button>
+                            </div>
+                            <input 
                                 value={item.text} 
                                 onChange={(e) => {
                                     const newItems = [...(section.content.items || [])];
                                     newItems[idx].text = e.target.value;
                                     onUpdate(section.id, { items: newItems });
                                 }}
-                                className="w-full bg-transparent border-none p-1 text-xs text-lumina-muted placeholder-gray-700 focus:ring-0 resize-none h-12"
-                                placeholder="Description"
+                                className="w-full bg-transparent border-none p-1 text-xs text-lumina-muted placeholder-gray-700 focus:ring-0"
+                                placeholder={section.type === 'TEAM_GRID' ? "Role" : "Description"}
                             />
+                            {section.type === 'TEAM_GRID' && (
+                                <ImageUploader 
+                                    value={item.image}
+                                    onChange={(url: string) => {
+                                        const newItems = [...(section.content.items || [])];
+                                        newItems[idx].image = url;
+                                        onUpdate(section.id, { items: newItems });
+                                    }}
+                                    className="w-full bg-lumina-surface border border-lumina-highlight rounded p-1 text-[10px] mt-1"
+                                />
+                            )}
                         </div>
                     ))}
                     <button 
-                        onClick={() => onUpdate(section.id, { items: [...(section.content.items || []), { title: 'New Feature', text: 'Description here.' }] })}
+                        onClick={() => onUpdate(section.id, { items: [...(section.content.items || []), { title: section.type === 'TEAM_GRID' ? 'New Member' : 'New Feature', text: '', image: '' }] })}
                         className="w-full py-1.5 border border-dashed border-lumina-highlight rounded text-[10px] text-lumina-muted hover:text-white hover:border-lumina-accent"
                     >
-                        + Add Feature
+                        + Add {section.type === 'TEAM_GRID' ? 'Member' : 'Feature'}
                     </button>
                 </div>
             )}

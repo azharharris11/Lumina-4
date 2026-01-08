@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
-import { Booking, StudioConfig, ProofingItem } from '../../types';
-import { CheckCircle2, Download, MessageCircle, HardDrive, Lock, Image as ImageIcon, Heart, LayoutDashboard, Grid, Send } from 'lucide-react';
+import { Booking, StudioConfig, ProofingItem, ActivityLog } from '../../types';
+import { CheckCircle2, Download, MessageCircle, HardDrive, Lock, Image as ImageIcon, Heart, LayoutDashboard, Grid, Send, FileSignature } from 'lucide-react';
 import InvoiceModal from '../InvoiceModal';
+import ContractViewer from '../ContractViewer';
 import { motion, AnimatePresence } from 'framer-motion';
-import { updateDoc, doc } from 'firebase/firestore';
+import { updateDoc, doc, arrayUnion } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 const Motion = motion as any;
@@ -14,9 +14,11 @@ interface ClientPortalProps {
     config: StudioConfig;
 }
 
-const ClientPortal: React.FC<ClientPortalProps> = ({ booking, config }) => {
+const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, config }) => {
+    // Keep local state of booking to reflect changes immediately without reload
+    const [booking, setBooking] = useState<Booking>(initialBooking);
     const [portalMode, setPortalMode] = useState<'LOGIN' | 'DASHBOARD'>('LOGIN');
-    const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'GALLERY' | 'SELECTED'>('DASHBOARD');
+    const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'GALLERY' | 'SELECTED' | 'CONTRACT'>('DASHBOARD');
     const [phoneInput, setPhoneInput] = useState('');
     const [loginError, setLoginError] = useState('');
     const [showInvoice, setShowInvoice] = useState(false);
@@ -40,6 +42,40 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking, config }) => {
             setPortalMode('DASHBOARD');
         } else {
             setLoginError("Verification failed. Please enter the last 4 digits of your phone number.");
+        }
+    };
+
+    const handleClientSign = async (signatureUrl: string) => {
+        try {
+            const newLog: ActivityLog = {
+                id: `log-${Date.now()}`,
+                timestamp: new Date().toISOString(),
+                action: 'CONTRACT_SIGNED',
+                details: 'Client signed digital contract via Portal',
+                userId: 'CLIENT',
+                userName: booking.clientName
+            };
+
+            await updateDoc(doc(db, "bookings", booking.id), {
+                contractStatus: 'SIGNED',
+                contractSignedDate: new Date().toISOString(),
+                contractSignature: signatureUrl,
+                logs: arrayUnion(newLog)
+            });
+
+            // Update local state
+            setBooking(prev => ({
+                ...prev,
+                contractStatus: 'SIGNED',
+                contractSignedDate: new Date().toISOString(),
+                contractSignature: signatureUrl,
+                logs: [newLog, ...(prev.logs || [])]
+            }));
+
+            alert("Contract signed successfully! Thank you.");
+        } catch (error) {
+            console.error("Error signing contract:", error);
+            alert("Failed to save contract. Please try again.");
         }
     };
 
@@ -70,6 +106,8 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking, config }) => {
             await updateDoc(doc(db, "bookings", booking.id), {
                 selectionSubmitted: true
             });
+            // Update local state
+            setBooking(prev => ({ ...prev, selectionSubmitted: true }));
             alert("Selection submitted successfully! We will proceed with editing.");
         } catch (e) {
             alert("Error submitting selection.");
@@ -119,63 +157,149 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking, config }) => {
     const balance = (booking.price * (1 + config.taxRate/100)) - booking.paidAmount;
     const isPaid = balance <= 100;
     
+    // Branding Styles
+    const accentColor = config.portalAccentColor || '#10b981'; // Default Emerald-500
+    const bgColor = config.portalBackgroundColor || '#0a0a0a'; // Default Neutral-950
+    const bgImage = config.portalBackgroundUrl ? `url(${config.portalBackgroundUrl})` : 'none';
+
+    // Helper for hex to rgba
+    const hexToRgba = (hex: string, alpha: number) => {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    };
+
+    if (portalMode === 'LOGIN') {
+        return (
+            <div className="min-h-screen flex items-center justify-center p-6 font-sans relative" style={{ backgroundColor: bgColor }}>
+                {config.portalBackgroundUrl && (
+                    <div className="absolute inset-0 z-0 opacity-30" style={{ backgroundImage: bgImage, backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
+                )}
+                <div className="w-full max-w-md bg-neutral-800/90 backdrop-blur border border-neutral-700 rounded-2xl p-8 shadow-2xl z-10 relative">
+                    <div className="text-center mb-8">
+                        {config.logoUrl && <img src={config.logoUrl} className="h-12 mx-auto mb-4 object-contain" />}
+                        <h2 className="text-2xl font-bold text-white mb-2">{config.name}</h2>
+                        <p className="text-neutral-400 text-sm">Client Portal Access</p>
+                    </div>
+                    <div className="bg-neutral-900/50 p-4 rounded-xl mb-6 border border-neutral-700 text-center">
+                        <p className="text-xs text-neutral-500 uppercase font-bold tracking-widest mb-1">Project</p>
+                        <p className="text-white font-bold text-lg">{booking.package}</p>
+                        <p className="text-neutral-400 text-sm">{new Date(booking.date).toLocaleDateString()}</p>
+                    </div>
+                    <form onSubmit={handleLogin} className="space-y-4">
+                        <div>
+                            <label className="block text-xs font-bold text-neutral-500 uppercase mb-1">Verify Identity</label>
+                            <input 
+                                type="text" 
+                                placeholder="Last 4 digits of your phone number"
+                                className="w-full bg-neutral-900/50 border border-neutral-700 rounded-lg p-3 text-white text-center tracking-widest focus:border-white outline-none transition-colors"
+                                maxLength={4}
+                                value={phoneInput}
+                                onChange={e => setPhoneInput(e.target.value)}
+                            />
+                        </div>
+                        {loginError && <p className="text-rose-500 text-xs text-center">{loginError}</p>}
+                        <button 
+                            className="w-full text-white font-bold py-3 rounded-lg transition-transform active:scale-95"
+                            style={{ backgroundColor: accentColor }}
+                        >
+                            Access Dashboard
+                        </button>
+                    </form>
+                </div>
+            </div>
+        );
+    }
+
     // Filter selected photos for the "Selected" tab
     const selectedPhotos = proofingData.filter(p => p.selected);
 
     return (
-        <div className="min-h-screen bg-neutral-950 text-white font-sans pb-20">
+        <div className="min-h-screen text-white font-sans pb-20 relative" style={{ backgroundColor: bgColor }}>
+            {/* Dynamic Background Layer */}
+            {config.portalBackgroundUrl && (
+                <div className="fixed inset-0 z-0 opacity-20 pointer-events-none" style={{ backgroundImage: bgImage, backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
+            )}
+
             {/* Top Bar */}
-            <nav className="border-b border-neutral-800 bg-neutral-900/50 backdrop-blur sticky top-0 z-50">
+            <nav className="border-b border-white/10 bg-black/20 backdrop-blur sticky top-0 z-50">
                 <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
                     <span className="font-bold text-lg hidden md:block">{config.name}</span>
-                    <div className="flex bg-neutral-800 p-1 rounded-lg">
-                        <button 
-                            onClick={() => setActiveTab('DASHBOARD')}
-                            className={`px-4 py-1.5 text-xs font-bold rounded-md flex items-center gap-2 transition-colors ${activeTab === 'DASHBOARD' ? 'bg-white text-black shadow-sm' : 'text-neutral-400 hover:text-white'}`}
-                        >
-                            <LayoutDashboard size={14} /> <span className="hidden sm:inline">Dashboard</span>
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('GALLERY')}
-                            className={`px-4 py-1.5 text-xs font-bold rounded-md flex items-center gap-2 transition-colors ${activeTab === 'GALLERY' ? 'bg-white text-black shadow-sm' : 'text-neutral-400 hover:text-white'}`}
-                        >
-                            <Grid size={14} /> <span className="hidden sm:inline">Photos</span>
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('SELECTED')}
-                            className={`px-4 py-1.5 text-xs font-bold rounded-md flex items-center gap-2 transition-colors ${activeTab === 'SELECTED' ? 'bg-rose-500 text-white shadow-sm' : 'text-neutral-400 hover:text-white'}`}
-                        >
-                            <Heart size={14} className={activeTab === 'SELECTED' ? 'fill-white' : ''} /> 
-                            <span className="hidden sm:inline">Selected</span>
-                            <span className="bg-neutral-900 px-1.5 rounded-full text-[10px] min-w-[16px] text-center">{selectedPhotos.length}</span>
-                        </button>
+                    <div className="flex bg-white/10 p-1 rounded-lg overflow-x-auto no-scrollbar">
+                        {/* Nav Buttons with Dynamic Active State */}
+                        {[
+                            { id: 'DASHBOARD', icon: LayoutDashboard, label: 'Dashboard' },
+                            { id: 'CONTRACT', icon: FileSignature, label: 'Contract' },
+                            { id: 'GALLERY', icon: Grid, label: 'Photos' },
+                            { id: 'SELECTED', icon: Heart, label: 'Selected', count: selectedPhotos.length }
+                        ].map(tab => (
+                            <button 
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id as any)}
+                                className={`px-3 md:px-4 py-1.5 text-xs font-bold rounded-md flex items-center gap-2 transition-colors whitespace-nowrap
+                                    ${activeTab === tab.id ? 'text-white shadow-sm' : 'text-neutral-400 hover:text-white'}
+                                `}
+                                style={activeTab === tab.id ? { backgroundColor: accentColor } : {}}
+                            >
+                                <tab.icon size={14} className={activeTab === tab.id && tab.id === 'SELECTED' ? 'fill-white' : ''} /> 
+                                <span className="hidden sm:inline">{tab.label}</span>
+                                {tab.count !== undefined && <span className="bg-black/20 px-1.5 rounded-full text-[10px] min-w-[16px] text-center">{tab.count}</span>}
+                            </button>
+                        ))}
                     </div>
-                    <div className="text-xs font-bold bg-neutral-800 px-3 py-1 rounded-full text-neutral-400 hidden md:block">
+                    <div className="text-xs font-bold bg-white/10 px-3 py-1 rounded-full text-neutral-400 hidden md:block">
                         #{booking.id.substring(booking.id.length-4).toUpperCase()}
                     </div>
                 </div>
             </nav>
 
-            <main className="max-w-6xl mx-auto px-4 md:px-6 py-8">
+            <main className="max-w-6xl mx-auto px-4 md:px-6 py-8 relative z-10">
                 
                 {/* --- DASHBOARD TAB --- */}
                 {activeTab === 'DASHBOARD' && (
                     <Motion.div initial={{opacity: 0, y: 10}} animate={{opacity: 1, y: 0}} className="space-y-8">
-                        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 md:p-8 overflow-x-auto">
+                        {/* Booking Alert if Contract not signed */}
+                        {booking.contractStatus !== 'SIGNED' && (
+                            <div onClick={() => setActiveTab('CONTRACT')} className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl flex items-center gap-4 cursor-pointer hover:bg-amber-500/20 transition-colors">
+                                <div className="p-2 bg-amber-500 text-amber-950 rounded-lg">
+                                    <FileSignature size={24}/>
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-amber-400">Action Required: Sign Contract</h3>
+                                    <p className="text-sm text-amber-200/70">Please review and sign your service agreement to secure your booking.</p>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-6 md:p-8 overflow-x-auto">
                             <h3 className="text-sm font-bold text-neutral-500 uppercase tracking-widest mb-8">Project Timeline</h3>
                             <div className="flex items-center min-w-[600px]">
                                 {steps.map((step, i) => (
                                     <div key={step} className="flex-1 relative last:flex-none">
                                         <div className="flex items-center gap-4">
-                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs border-2 z-10 relative
-                                                ${i <= currentStepIndex ? 'bg-white text-black border-white' : 'bg-neutral-800 text-neutral-500 border-neutral-700'}
-                                            `}>
+                                            <div 
+                                                className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs border-2 z-10 relative transition-colors`}
+                                                style={{ 
+                                                    backgroundColor: i <= currentStepIndex ? accentColor : 'transparent',
+                                                    borderColor: i <= currentStepIndex ? accentColor : '#404040',
+                                                    color: i <= currentStepIndex ? 'white' : '#737373'
+                                                }}
+                                            >
                                                 {i < currentStepIndex ? <CheckCircle2 size={16}/> : i + 1}
                                             </div>
                                             <div className={`text-sm font-bold ${i <= currentStepIndex ? 'text-white' : 'text-neutral-600'}`}>{step}</div>
                                         </div>
                                         {i < steps.length - 1 && (
-                                            <div className={`absolute top-5 left-10 right-[-20px] h-0.5 ${i < currentStepIndex ? 'bg-white' : 'bg-neutral-800'}`}></div>
+                                            <div className="absolute top-5 left-10 right-[-20px] h-0.5 bg-neutral-800">
+                                                <div 
+                                                    className="h-full transition-all duration-500" 
+                                                    style={{ 
+                                                        width: i < currentStepIndex ? '100%' : '0%',
+                                                        backgroundColor: accentColor 
+                                                    }}
+                                                ></div>
+                                            </div>
                                         )}
                                     </div>
                                 ))}
@@ -183,7 +307,7 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking, config }) => {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 flex flex-col justify-between">
+                            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col justify-between">
                                 <div>
                                     <h3 className="text-sm font-bold text-neutral-500 uppercase tracking-widest mb-6">Financial Overview</h3>
                                     <div className="space-y-4">
@@ -193,31 +317,80 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking, config }) => {
                                         </div>
                                         <div className="flex justify-between items-center text-sm">
                                             <span className="text-neutral-400">Paid to Date</span>
-                                            <span className="font-bold text-emerald-500">Rp {booking.paidAmount.toLocaleString()}</span>
+                                            <span className="font-bold" style={{ color: accentColor }}>Rp {booking.paidAmount.toLocaleString()}</span>
                                         </div>
-                                        <div className="pt-4 border-t border-neutral-800 flex justify-between items-center">
+                                        <div className="pt-4 border-t border-white/10 flex justify-between items-center">
                                             <span className="font-bold">Balance Due</span>
                                             <span className={`text-xl font-mono font-bold ${isPaid ? 'text-emerald-500' : 'text-rose-500'}`}>
                                                 Rp {balance > 0 ? balance.toLocaleString() : '0'}
                                             </span>
                                         </div>
+
+                                        {/* Dynamic Payment Options */}
+                                        {!isPaid && (
+                                            <div className="pt-4 border-t border-white/10">
+                                                <p className="text-xs text-neutral-500 font-bold uppercase mb-2">Payment Options</p>
+                                                {(config.paymentChannels && config.paymentChannels.length > 0) ? (
+                                                    <div className="space-y-2">
+                                                        {config.paymentChannels.map(channel => (
+                                                            <div key={channel.id} className="bg-white/5 p-3 rounded-lg flex justify-between items-center text-sm hover:bg-white/10 transition-colors">
+                                                                <div>
+                                                                    <p className="font-bold text-white flex items-center gap-2">
+                                                                        {channel.name}
+                                                                        <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded text-neutral-400">{channel.type}</span>
+                                                                    </p>
+                                                                    <p className="font-mono text-neutral-300 text-xs">{channel.number}</p>
+                                                                    {channel.holder && <p className="text-[10px] text-neutral-500 uppercase">{channel.holder}</p>}
+                                                                </div>
+                                                                {channel.type === 'QRIS' && channel.qrUrl && (
+                                                                    <img src={channel.qrUrl} className="h-10 w-10 bg-white rounded p-0.5" alt="QR"/>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div className="bg-white/5 p-3 rounded-lg text-sm text-neutral-300">
+                                                        <p className="font-bold">{config.bankName}</p>
+                                                        <p className="font-mono">{config.bankAccount}</p>
+                                                        <p className="text-xs text-neutral-500">{config.bankHolder}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
-                                <div className="mt-8 pt-6 border-t border-neutral-800">
+                                <div className="mt-8 pt-6 border-t border-white/10">
                                     <button onClick={() => setShowInvoice(true)} className="w-full py-3 bg-white text-black font-bold rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center gap-2">
                                         <Download size={18} /> Download Invoice
                                     </button>
                                 </div>
                             </div>
 
-                            <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6">
+                            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
                                 <h3 className="font-bold text-white mb-2">Need Help?</h3>
                                 <p className="text-sm text-neutral-400 mb-6">Contact us via WhatsApp for quick support.</p>
-                                <a href={`https://wa.me/${config.phone.replace(/\D/g, '')}`} target="_blank" className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2">
+                                <a 
+                                    href={`https://wa.me/${config.phone.replace(/\D/g, '')}`} 
+                                    target="_blank" 
+                                    className="w-full py-3 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2 hover:brightness-110"
+                                    style={{ backgroundColor: accentColor }}
+                                >
                                     <MessageCircle size={18} /> Chat Support
                                 </a>
                             </div>
                         </div>
+                    </Motion.div>
+                )}
+
+                {/* --- CONTRACT TAB --- */}
+                {activeTab === 'CONTRACT' && (
+                    <Motion.div initial={{opacity: 0}} animate={{opacity: 1}}>
+                        <ContractViewer 
+                            booking={booking} 
+                            config={config} 
+                            onSign={handleClientSign}
+                            readOnly={false} 
+                        />
                     </Motion.div>
                 )}
 

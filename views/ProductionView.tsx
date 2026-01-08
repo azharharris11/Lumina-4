@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Booking, ProjectStatus, User, StudioConfig } from '../types';
 import ProductionKanbanCard from '../components/production/ProductionKanbanCard';
+import { Search, X } from 'lucide-react';
 
 interface ProductionViewProps {
   bookings: Booking[];
@@ -13,6 +14,7 @@ interface ProductionViewProps {
 
 const ProductionView: React.FC<ProductionViewProps> = ({ bookings, onSelectBooking, currentUser, onUpdateBooking }) => {
   const [filterMode, setFilterMode] = useState<'ALL' | 'MINE'>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
   const [draggedBookingId, setDraggedBookingId] = useState<string | null>(null);
   const [activeDropColumn, setActiveDropColumn] = useState<ProjectStatus | null>(null);
 
@@ -27,10 +29,16 @@ const ProductionView: React.FC<ProductionViewProps> = ({ bookings, onSelectBooki
   const getColumnBookings = (status: ProjectStatus) => {
     return bookings.filter(b => {
         const statusMatch = b.status === status;
-        if (filterMode === 'ALL') return statusMatch;
-        // For 'MINE', check if user is photographer or editor
-        const userMatch = (b.photographerId === currentUser?.id) || (b.editorId === currentUser?.id);
-        return statusMatch && userMatch;
+        const queryMatch = searchQuery === '' || 
+            b.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            b.package.toLowerCase().includes(searchQuery.toLowerCase());
+        
+        let userMatch = true;
+        if (filterMode === 'MINE') {
+            userMatch = (b.photographerId === currentUser?.id) || (b.editorId === currentUser?.id);
+        }
+
+        return statusMatch && queryMatch && userMatch;
     }).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   };
 
@@ -58,24 +66,47 @@ const ProductionView: React.FC<ProductionViewProps> = ({ bookings, onSelectBooki
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex justify-between items-center mb-6 shrink-0">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 shrink-0">
         <div>
-          <h1 className="text-4xl font-display font-bold text-white mb-2">Production Board</h1>
+          <h1 className="text-4xl font-display font-bold text-white mb-2 text-glow">Production Board</h1>
           <p className="text-lumina-muted">Track post-production workflow.</p>
         </div>
-        <div className="bg-lumina-surface border border-lumina-highlight rounded-lg p-1 flex">
-            <button 
-                onClick={() => setFilterMode('ALL')}
-                className={`px-4 py-2 text-xs font-bold rounded transition-colors ${filterMode === 'ALL' ? 'bg-lumina-highlight text-white' : 'text-lumina-muted hover:text-white'}`}
-            >
-                All Jobs
-            </button>
-            <button 
-                onClick={() => setFilterMode('MINE')}
-                className={`px-4 py-2 text-xs font-bold rounded transition-colors ${filterMode === 'MINE' ? 'bg-lumina-highlight text-white' : 'text-lumina-muted hover:text-white'}`}
-            >
-                My Tasks
-            </button>
+        
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+            {/* Search Input */}
+            <div className="relative group flex-1 sm:w-64">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-lumina-muted group-focus-within:text-lumina-accent transition-colors" />
+                <input 
+                    type="text"
+                    placeholder="Find client or project..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-lumina-surface border border-lumina-highlight rounded-xl pl-10 pr-10 py-2.5 text-sm text-white focus:border-lumina-accent/50 focus:outline-none transition-all"
+                />
+                {searchQuery && (
+                    <button 
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-lumina-muted hover:text-white"
+                    >
+                        <X size={14} />
+                    </button>
+                )}
+            </div>
+
+            <div className="bg-lumina-surface border border-lumina-highlight rounded-xl p-1 flex">
+                <button 
+                    onClick={() => setFilterMode('ALL')}
+                    className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${filterMode === 'ALL' ? 'bg-lumina-highlight text-white shadow-sm' : 'text-lumina-muted hover:text-white'}`}
+                >
+                    All Jobs
+                </button>
+                <button 
+                    onClick={() => setFilterMode('MINE')}
+                    className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${filterMode === 'MINE' ? 'bg-lumina-highlight text-white shadow-sm' : 'text-lumina-muted hover:text-white'}`}
+                >
+                    My Tasks
+                </button>
+            </div>
         </div>
       </div>
 

@@ -15,7 +15,10 @@ import {
   persistentLocalCache, 
   persistentMultipleTabManager 
 } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
+import { getStorage, connectStorageEmulator } from 'firebase/storage';
+import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
+import { connectAuthEmulator } from 'firebase/auth';
+import { connectFirestoreEmulator } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCKfFRG53GggBNgMyEuBGy-FJKFf4Eqni8",
@@ -30,6 +33,7 @@ const firebaseConfig = {
 // Initialize Firebase (Modular)
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const functions = getFunctions(app);
 
 // Initialize Firestore with modern persistence settings
 // This handles multiple tabs better and avoids "failed-precondition" errors
@@ -43,11 +47,16 @@ const db = initializeFirestore(app, {
 const storage = getStorage(app);
 const googleProvider = new GoogleAuthProvider();
 
+// --- EMULATOR CONFIGURATION ---
+// Emulator logic removed. App will always connect to Firebase Production.
+
 export { 
   auth, 
   db, 
   storage,
-  googleProvider, 
+  functions,
+  googleProvider,
+  GoogleAuthProvider,
   onAuthStateChanged, 
   signOut, 
   signInWithEmailAndPassword, 

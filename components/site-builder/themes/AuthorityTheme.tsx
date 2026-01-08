@@ -4,6 +4,11 @@ import { motion } from 'framer-motion';
 import { SiteConfig, Package, User, SiteGalleryItem, SiteTestimonial, SiteFAQ, StudioConfig, PublicBookingSubmission, SitePage, SiteSection, Booking } from '../../../types';
 import BookingWidget from '../BookingWidget';
 import { ShieldCheck, Star, ArrowDown, CheckCircle, Award, Lock } from 'lucide-react';
+import ContactBlock from '../blocks/ContactBlock';
+import TeamBlock from '../blocks/TeamBlock';
+import VideoBlock from '../blocks/VideoBlock';
+import RichTextBlock from '../blocks/RichTextBlock';
+import GalleryBlock from '../blocks/GalleryBlock';
 
 const Motion = motion as any;
 
@@ -208,20 +213,75 @@ const AuthorityTheme: React.FC<ThemeProps> = ({ site, activePage, packages, user
                 case 'PRICING': return <div key={section.id}>{renderPricing(section.content.headline || 'Investment')}</div>;
                 case 'FAQ': return <div key={section.id}>{renderFAQ(section.content.headline || 'FAQ', site.faq)}</div>;
                 case 'CTA_BANNER': return <div key={section.id}>{renderCTA(section.content.headline || 'Ready to begin?', section.content.buttonText || 'Inquire Now')}</div>;
-                case 'GALLERY': return <div key={section.id}></div>; // Reusing portfolio section logic below
+                case 'CONTACT_FORM': return (
+                    <ContactBlock 
+                        key={section.id}
+                        headline={section.content.headline}
+                        description={section.content.description}
+                        className="bg-[#0f0f0f] border-t border-white/5"
+                        titleClassName="text-white font-serif"
+                        descClassName="text-gray-400"
+                        inputClassName="bg-[#1a1a1a] border-white/10 text-white focus:border-amber-600"
+                        buttonClassName="bg-amber-600 text-black hover:bg-amber-500"
+                    />
+                );
+                case 'TEAM_GRID': 
+                    const members = (section.content.items && section.content.items.length > 0) 
+                        ? section.content.items.map((item, idx) => ({ id: `manual-${idx}`, name: item.title, role: item.text, image: item.image || '' }))
+                        : users.filter(u => u.status === 'ACTIVE').map(u => ({ id: u.id, name: u.name, role: u.role, image: u.avatar }));
+                    
+                    return (
+                        <TeamBlock 
+                            key={section.id}
+                            headline={section.content.headline}
+                            description={section.content.description}
+                            members={members}
+                            className="bg-[#141414]"
+                            titleClassName="text-white font-serif"
+                            descClassName="text-gray-400"
+                            cardClassName="bg-[#0f0f0f] p-4 border border-white/5"
+                        />
+                    );
+                case 'VIDEO_EMBED': return (
+                    <VideoBlock 
+                        key={section.id}
+                        headline={section.content.headline}
+                        description={section.content.description}
+                        videoUrl={section.content.videoUrl || ''}
+                        className="bg-[#0f0f0f]"
+                        titleClassName="text-white font-serif"
+                        descClassName="text-gray-400"
+                    />
+                );
+                case 'RICH_TEXT': return (
+                    <RichTextBlock 
+                        key={section.id}
+                        html={section.content.html || ''}
+                        className="bg-[#141414] prose-invert prose-headings:font-serif prose-headings:text-amber-500"
+                    />
+                );
+                case 'GALLERY': return (
+                     <GalleryBlock 
+                        key={section.id}
+                        headline={section.content.headline}
+                        images={site.gallery}
+                        className="bg-[#141414]"
+                        titleClassName="text-white font-serif"
+                    />
+                );
                 default: return null;
             }
         });
     };
 
     return (
-        <div className="bg-[#0f0f0f] text-white font-sans min-h-full overflow-x-hidden selection:bg-amber-600 selection:text-black">
-            <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4 bg-[#0f0f0f]/90 backdrop-blur-md border-b border-white/5 flex justify-between items-center">
+        <div className="bg-[var(--site-bg)] text-[var(--site-text)] font-sans min-h-full overflow-x-hidden selection:bg-[var(--site-primary)] selection:text-[var(--site-bg)] transition-colors duration-300">
+            <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4 bg-[var(--site-bg)]/90 backdrop-blur-md border-b border-[var(--site-text)]/5 flex justify-between items-center">
                 <span onClick={() => onNavigate && onNavigate('HOME')} className="font-serif text-xl tracking-widest cursor-pointer">{site.title}</span>
-                <div className="hidden md:flex gap-8 text-xs font-bold uppercase tracking-widest text-gray-400">
-                    <button onClick={() => onNavigate && onNavigate('HOME')} className="hover:text-amber-500 transition-colors">Home</button>
+                <div className="hidden md:flex gap-8 text-xs font-bold uppercase tracking-widest opacity-50">
+                    <button onClick={() => onNavigate && onNavigate('HOME')} className="hover:opacity-100 transition-opacity">Home</button>
                     {site.pages?.map(page => (
-                        <button key={page.id} onClick={() => onNavigate && onNavigate(page.id)} className="hover:text-amber-500 transition-colors">{page.title}</button>
+                        <button key={page.id} onClick={() => onNavigate && onNavigate(page.id)} className="hover:opacity-100 transition-opacity">{page.title}</button>
                     ))}
                 </div>
                 <button 
@@ -229,7 +289,7 @@ const AuthorityTheme: React.FC<ThemeProps> = ({ site, activePage, packages, user
                         const widget = document.getElementById('booking-widget');
                         if(widget) widget.scrollIntoView({ behavior: 'smooth' });
                     }}
-                    className="border border-amber-600 text-amber-600 px-6 py-2 text-xs font-bold uppercase tracking-widest hover:bg-amber-600 hover:text-black transition-all"
+                    className="border border-[var(--site-primary)] text-[var(--site-primary)] px-6 py-2 text-xs font-bold uppercase tracking-widest hover:bg-[var(--site-primary)] hover:text-[var(--site-bg)] transition-all"
                 >
                     Reserve
                 </button>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Aperture, ArrowRight, Mail, Lock, User as UserIcon, Building, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { auth, db, googleProvider, createUserWithEmailAndPassword, updateProfile, signInWithPopup } from '../firebase';
+import { auth, db, googleProvider, GoogleAuthProvider, createUserWithEmailAndPassword, updateProfile, signInWithPopup } from '../firebase';
 import { User } from '../types';
 
 const Motion = motion as any;
@@ -103,8 +103,18 @@ const RegisterView: React.FC<RegisterViewProps> = ({ onLoginLink, onRegisterSucc
       setError(null);
       setIsLoading(true);
       try {
+          // Request scopes
+          googleProvider.addScope('https://www.googleapis.com/auth/drive');
+          googleProvider.addScope('https://www.googleapis.com/auth/calendar');
+
           const result = await signInWithPopup(auth, googleProvider);
           const user = result.user;
+          const credential = GoogleAuthProvider.credentialFromResult(result);
+          const token = credential?.accessToken;
+          
+          if (token) {
+              sessionStorage.setItem('lumina_g_token', token);
+          }
 
           try {
               const docRef = doc(db, "users", user.uid);

@@ -1,0 +1,65 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper: Check if user is authenticated and matches the ID
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Helper: Check if the document's 'ownerId' field matches the user's UID
+    // Validates both creating new docs (request.resource) and updating/deleting (resource)
+    function isResourceOwner() {
+      return request.auth != null && (
+        (resource == null && request.resource.data.ownerId == request.auth.uid) || 
+        (resource != null && resource.data.ownerId == request.auth.uid)
+      );
+    }
+
+    // User Profiles
+    // Allow create if auth matches ID
+    // Allow read/update/delete if auth matches ID
+    match /users/{userId} {
+      allow create: if isOwner(userId);
+      allow read, update, delete: if isOwner(userId);
+    }
+
+    // Studio Configuration
+    match /studios/{userId} {
+      allow read: if true; // Needed for public sites
+      allow write: if isOwner(userId);
+    }
+
+    // Business Data Collections
+    match /bookings/{bookingId} {
+      allow read, write: if isResourceOwner();
+    }
+    
+    match /clients/{clientId} {
+      allow read, write: if isResourceOwner();
+    }
+    
+    match /assets/{assetId} {
+      allow read, write: if isResourceOwner();
+    }
+    
+    match /accounts/{accountId} {
+      allow read, create, delete: if isResourceOwner();
+      allow update: if isResourceOwner() 
+                    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['balance']));
+    }
+    
+    match /packages/{packageId} {
+      allow read, write: if isResourceOwner();
+    }
+    
+    match /transactions/{transactionId} {
+      allow read, write: if isResourceOwner();
+    }
+
+    match /subdomain_registry/{subdomain} {
+      allow read: if request.auth != null;
+      allow write: if false; 
+    }
+  }
+}

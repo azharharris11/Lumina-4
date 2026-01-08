@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "TestSprite": {
+      "command": "node",
+      "args": [
+        "./node_modules/@testsprite/testsprite-mcp/dist/index.js"
+      ],
+      "env": {
+        "API_KEY": "sk-user-oNxhHWX2o9lRLzKxFkQ0NHGmfFTFiPQKRDz1me4w7gt6iFbFygkteS9fJSOThmT9VyRarTElpfRt_cXwn7SPrENXfze_XnEHfLSV8ljN5U-_M5HTdwlSKhWe47xhoFkz8q8
+      }
+    }
+  }
+}

@@ -4,6 +4,11 @@ import { motion } from 'framer-motion';
 import { SiteConfig, Package, User, SiteGalleryItem, StudioConfig, PublicBookingSubmission, SitePage, SiteSection, Booking } from '../../../types';
 import BookingWidget from '../BookingWidget';
 import { CheckCircle2, AlertTriangle, Lock, ArrowDown } from 'lucide-react';
+import ContactBlock from '../blocks/ContactBlock';
+import TeamBlock from '../blocks/TeamBlock';
+import VideoBlock from '../blocks/VideoBlock';
+import RichTextBlock from '../blocks/RichTextBlock';
+import GalleryBlock from '../blocks/GalleryBlock';
 
 interface ThemeProps {
     site: SiteConfig;
@@ -27,7 +32,7 @@ const ImpactTheme: React.FC<ThemeProps> = ({ site, activePage, packages, users, 
     };
 
     const renderHero = (headline: string, desc: string, img: string, sub?: string) => (
-        <header className="bg-white text-black pb-8 md:pb-12">
+        <header className="bg-[var(--site-bg)] text-[var(--site-text)] pb-8 md:pb-12 transition-colors duration-300">
             {/* Eyebrow / Warning Bar */}
             <div className="bg-[#dc2626] text-white p-2 md:p-3 text-center font-bold text-sm md:text-base uppercase tracking-wide flex items-center justify-center gap-2">
                 <AlertTriangle size={18} fill="white" className="text-[#dc2626]" />
@@ -38,13 +43,13 @@ const ImpactTheme: React.FC<ThemeProps> = ({ site, activePage, packages, users, 
                 <h1 className="text-4xl md:text-6xl font-black uppercase leading-[1.1] mb-6 tracking-tight">
                     {headline}
                 </h1>
-                <div className="w-full h-1 bg-black mb-6"></div>
-                <p className="text-lg md:text-xl font-medium leading-relaxed mb-8 text-gray-800">
+                <div className="w-full h-1 bg-[var(--site-text)] mb-6"></div>
+                <p className="text-lg md:text-xl font-medium leading-relaxed mb-8 opacity-80">
                     {desc}
                 </p>
                 
                 {/* Mobile-friendly Video/Image container */}
-                <div className="mb-8 border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] bg-gray-200 aspect-video relative overflow-hidden">
+                <div className="mb-8 border-4 border-[var(--site-text)] shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] bg-gray-200 aspect-video relative overflow-hidden">
                     <img src={img} className="w-full h-full object-cover" alt="Hero" />
                     <div className="absolute inset-0 flex items-center justify-center">
                         <div className="w-16 h-16 bg-[#dc2626] rounded-full flex items-center justify-center text-white border-4 border-white shadow-lg">
@@ -62,13 +67,13 @@ const ImpactTheme: React.FC<ThemeProps> = ({ site, activePage, packages, users, 
                 >
                     Yes! I Want To Book Now
                 </button>
-                <p className="text-xs text-gray-500 uppercase font-bold">No Credit Card Required To Check Availability</p>
+                <p className="text-xs opacity-50 uppercase font-bold">No Credit Card Required To Check Availability</p>
             </div>
         </header>
     );
 
     const renderTextImage = (headline: string, desc: string, img: string, layout: 'LEFT' | 'RIGHT' | 'CENTER') => (
-        <section className="py-12 px-4 bg-[#f9fafb]">
+        <section className="py-12 px-4 bg-[var(--site-bg)] opacity-95">
             <div className="max-w-[600px] mx-auto">
                 <h2 className="text-2xl md:text-4xl font-black uppercase mb-6 leading-tight text-center">
                     {headline}
@@ -76,11 +81,11 @@ const ImpactTheme: React.FC<ThemeProps> = ({ site, activePage, packages, users, 
                 
                 <div className="flex flex-col gap-6">
                     {/* Force Image Top on Mobile, adhere to layout on desktop if wanted, but single column is best for impact */}
-                    <div className="border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] overflow-hidden">
+                    <div className="border-4 border-[var(--site-text)] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] overflow-hidden">
                         <img src={img} className="w-full h-auto" alt="Content" />
                     </div>
                     
-                    <div className="prose prose-lg text-gray-800 font-medium leading-relaxed whitespace-pre-wrap">
+                    <div className="prose prose-lg text-[var(--site-text)] font-medium leading-relaxed whitespace-pre-wrap">
                         {desc}
                     </div>
                 </div>
@@ -89,8 +94,8 @@ const ImpactTheme: React.FC<ThemeProps> = ({ site, activePage, packages, users, 
     );
 
     const renderFeatures = (headline: string, items: {title: string, text: string}[]) => (
-        <section className="py-12 px-4 bg-white">
-            <div className="max-w-[600px] mx-auto border-4 border-black p-6 md:p-8 bg-[#fffbeb] shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+        <section className="py-12 px-4 bg-[var(--site-bg)]">
+            <div className="max-w-[600px] mx-auto border-4 border-[var(--site-text)] p-6 md:p-8 bg-[var(--site-bg)] shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
                 <h2 className="text-2xl md:text-3xl font-black uppercase text-center mb-8 underline decoration-[#dc2626] decoration-4 underline-offset-4">
                     {headline}
                 </h2>
@@ -100,7 +105,7 @@ const ImpactTheme: React.FC<ThemeProps> = ({ site, activePage, packages, users, 
                             <CheckCircle2 size={28} className="text-[#22c55e] shrink-0 fill-white" strokeWidth={3} />
                             <div>
                                 <h3 className="font-black text-lg uppercase mb-1">{item.title}</h3>
-                                <p className="text-sm md:text-base font-medium text-gray-700 leading-snug">{item.text}</p>
+                                <p className="text-sm md:text-base font-medium opacity-70 leading-snug">{item.text}</p>
                             </div>
                         </div>
                     ))}
@@ -110,27 +115,27 @@ const ImpactTheme: React.FC<ThemeProps> = ({ site, activePage, packages, users, 
     );
 
     const renderPricing = (headline: string) => (
-        <section className="py-12 px-4 bg-[#111] text-white">
+        <section className="py-12 px-4 bg-[var(--site-bg)] text-[var(--site-text)]">
             <div className="max-w-[600px] mx-auto">
-                <h2 className="text-3xl md:text-5xl font-black uppercase text-center mb-2 text-[#ffff00]">
+                <h2 className="text-3xl md:text-5xl font-black uppercase text-center mb-2 text-[var(--site-primary)]">
                     {headline || "The Offer"}
                 </h2>
-                <p className="text-center text-gray-400 mb-10 uppercase font-bold tracking-widest text-sm">
+                <p className="text-center opacity-50 mb-10 uppercase font-bold tracking-widest text-sm">
                     Choose Your Weapon
                 </p>
 
                 <div className="space-y-6">
                     {packages.filter((p: any) => p.active).map((pkg: any, idx: number) => (
-                        <div key={pkg.id} className={`relative bg-white text-black p-6 rounded-xl border-4 ${idx === 1 ? 'border-[#ffff00] scale-105 z-10' : 'border-gray-500'}`}>
+                        <div key={pkg.id} className={`relative bg-[var(--site-bg)] text-[var(--site-text)] p-6 rounded-xl border-4 ${idx === 1 ? 'border-[var(--site-primary)] scale-105 z-10' : 'border-[var(--site-text)]/20'}`}>
                             {idx === 1 && (
-                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#ffff00] text-black px-4 py-1 font-black uppercase text-sm border-2 border-black shadow-sm">
+                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[var(--site-primary)] text-[var(--site-bg)] px-4 py-1 font-black uppercase text-sm border-2 border-[var(--site-text)] shadow-sm">
                                     Most Popular
                                 </div>
                             )}
-                            <div className="flex justify-between items-end mb-4 border-b-2 border-gray-200 pb-4">
+                            <div className="flex justify-between items-end mb-4 border-b-2 border-[var(--site-text)]/10 pb-4">
                                 <h3 className="text-xl font-black uppercase">{pkg.name}</h3>
                                 <div className="text-right">
-                                    <span className="text-sm text-gray-500 line-through block font-bold">Rp {(pkg.price * 1.5 / 1000000).toFixed(1)}M</span>
+                                    <span className="text-sm opacity-50 line-through block font-bold">Rp {(pkg.price * 1.5 / 1000000).toFixed(1)}M</span>
                                     <span className="text-2xl font-black text-[#dc2626]">Rp {(pkg.price / 1000000).toFixed(1)}M</span>
                                 </div>
                             </div>
@@ -146,7 +151,7 @@ const ImpactTheme: React.FC<ThemeProps> = ({ site, activePage, packages, users, 
                                     const widget = document.getElementById('booking-widget');
                                     if(widget) widget.scrollIntoView({ behavior: 'smooth' });
                                 }}
-                                className="w-full py-3 bg-black text-white font-black uppercase text-lg rounded hover:bg-gray-800 transition-colors"
+                                className="w-full py-3 bg-[var(--site-text)] text-[var(--site-bg)] font-black uppercase text-lg rounded hover:opacity-80 transition-colors"
                             >
                                 Select This
                             </button>
@@ -158,18 +163,18 @@ const ImpactTheme: React.FC<ThemeProps> = ({ site, activePage, packages, users, 
     );
 
     const renderCTA = (headline: string, buttonText: string) => (
-        <section className="py-16 px-4 bg-[#ffff00] border-y-4 border-black text-center">
+        <section className="py-16 px-4 bg-[var(--site-primary)] border-y-4 border-[var(--site-text)] text-center">
             <div className="max-w-[600px] mx-auto">
-                <h2 className="text-3xl md:text-5xl font-black uppercase mb-6 text-black leading-none">
+                <h2 className="text-3xl md:text-5xl font-black uppercase mb-6 text-[var(--site-bg)] leading-none">
                     {headline}
                 </h2>
-                <ArrowDown size={48} className="mx-auto mb-6 animate-bounce text-black" strokeWidth={3} />
+                <ArrowDown size={48} className="mx-auto mb-6 animate-bounce text-[var(--site-bg)]" strokeWidth={3} />
                 <button 
                     onClick={() => {
                         const widget = document.getElementById('booking-widget');
                         if(widget) widget.scrollIntoView({ behavior: 'smooth' });
                     }}
-                    className="w-full py-5 bg-[#dc2626] text-white text-2xl font-black uppercase rounded-xl border-4 border-black shadow-[8px_8px_0px_0px_black] hover:translate-y-[2px] hover:shadow-[6px_6px_0px_0px_black] active:translate-y-[8px] active:shadow-none transition-all"
+                    className="w-full py-5 bg-[#dc2626] text-white text-2xl font-black uppercase rounded-xl border-4 border-[var(--site-text)] shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[2px] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] active:translate-y-[8px] active:shadow-none transition-all"
                 >
                     {buttonText}
                 </button>
@@ -187,19 +192,72 @@ const ImpactTheme: React.FC<ThemeProps> = ({ site, activePage, packages, users, 
                 case 'PRICING': return <div key={section.id}>{renderPricing(section.content.headline || 'Packages')}</div>;
                 case 'CTA_BANNER': return <div key={section.id}>{renderCTA(section.content.headline || 'Ready?', section.content.buttonText || 'Get Started')}</div>;
                 case 'FAQ': return site.faq && site.faq.length > 0 && (
-                    <section key={section.id} className="py-12 px-4 bg-white">
+                    <section key={section.id} className="py-12 px-4 bg-[var(--site-bg)]">
                         <div className="max-w-[600px] mx-auto">
                             <h2 className="text-3xl font-black uppercase text-center mb-8">FAQ</h2>
                             <div className="space-y-4">
                                 {site.faq.map(f => (
-                                    <div key={f.id} className="border-2 border-black p-4 bg-gray-50">
+                                    <div key={f.id} className="border-2 border-[var(--site-text)] p-4 bg-[var(--site-bg)] opacity-90">
                                         <h4 className="font-black text-lg mb-2">Q: {f.question}</h4>
-                                        <p className="text-gray-700 font-medium">A: {f.answer}</p>
+                                        <p className="opacity-70 font-medium">A: {f.answer}</p>
                                     </div>
                                 ))}
                             </div>
                         </div>
                     </section>
+                );
+                case 'CONTACT_FORM': return (
+                    <ContactBlock 
+                        key={section.id}
+                        headline={section.content.headline}
+                        description={section.content.description}
+                        className="bg-[var(--site-bg)] border-y-4 border-[var(--site-text)]"
+                        titleClassName="font-black uppercase text-3xl md:text-5xl"
+                        inputClassName="border-4 border-[var(--site-text)] p-4 font-bold bg-[var(--site-bg)] text-[var(--site-text)]"
+                        buttonClassName="bg-[#22c55e] text-white border-4 border-[#15803d] shadow-[4px_4px_0_0_black] hover:shadow-none hover:translate-x-[4px] hover:translate-y-[4px] uppercase font-black"
+                    />
+                );
+                case 'TEAM_GRID': 
+                    const members = (section.content.items && section.content.items.length > 0) 
+                        ? section.content.items.map((item, idx) => ({ id: `manual-${idx}`, name: item.title, role: item.text, image: item.image || '' }))
+                        : users.filter(u => u.status === 'ACTIVE').map(u => ({ id: u.id, name: u.name, role: u.role, image: u.avatar }));
+                    
+                    return (
+                        <TeamBlock 
+                            key={section.id}
+                            headline={section.content.headline}
+                            description={section.content.description}
+                            members={members}
+                            className="bg-[var(--site-primary)] border-b-4 border-[var(--site-text)]"
+                            titleClassName="font-black uppercase text-3xl md:text-5xl text-[var(--site-bg)]"
+                            cardClassName="bg-[var(--site-bg)] border-4 border-[var(--site-text)] p-6 shadow-[8px_8px_0_0_black]"
+                        />
+                    );
+                case 'VIDEO_EMBED': return (
+                    <VideoBlock 
+                        key={section.id}
+                        headline={section.content.headline}
+                        description={section.content.description}
+                        videoUrl={section.content.videoUrl || ''}
+                        className="bg-[var(--site-bg)] text-[var(--site-text)]"
+                        titleClassName="font-black uppercase text-[var(--site-primary)]"
+                    />
+                );
+                case 'RICH_TEXT': return (
+                    <RichTextBlock 
+                        key={section.id}
+                        html={section.content.html || ''}
+                        className="prose-headings:font-black prose-headings:uppercase border-y-4 border-[var(--site-text)] bg-[var(--site-bg)] p-8 max-w-[800px] mx-auto shadow-[8px_8px_0_0_black]"
+                    />
+                );
+                case 'GALLERY': return (
+                     <GalleryBlock 
+                        key={section.id}
+                        headline={section.content.headline}
+                        images={site.gallery}
+                        className="border-y-4 border-[var(--site-text)] bg-[var(--site-bg)]"
+                        titleClassName="font-black uppercase"
+                    />
                 );
                 default: return null;
             }
@@ -207,15 +265,15 @@ const ImpactTheme: React.FC<ThemeProps> = ({ site, activePage, packages, users, 
     };
 
     return (
-        <div className="bg-white text-black font-sans min-h-full overflow-x-hidden selection:bg-[#ffff00]">
+        <div className="bg-[var(--site-bg)] text-[var(--site-text)] font-sans min-h-full overflow-x-hidden selection:bg-[var(--site-primary)] selection:text-[var(--site-bg)] transition-colors duration-300">
             {/* Simple Nav */}
-            <nav className="p-4 border-b-4 border-black flex justify-between items-center sticky top-0 bg-white z-50">
+            <nav className="p-4 border-b-4 border-[var(--site-text)] flex justify-between items-center sticky top-0 bg-[var(--site-bg)] z-50">
                 <span className="font-black text-xl uppercase tracking-tighter">{site.title}</span>
                 {/* Basic Page Links */}
                 <div className="hidden md:flex gap-4 font-bold text-sm uppercase">
-                    <span onClick={() => onNavigate && onNavigate('HOME')} className="cursor-pointer hover:bg-[#ffff00] px-1">Home</span>
+                    <span onClick={() => onNavigate && onNavigate('HOME')} className="cursor-pointer hover:bg-[var(--site-primary)] px-1 transition-colors">Home</span>
                     {site.pages?.map(p => (
-                        <span key={p.id} onClick={() => onNavigate && onNavigate(p.id)} className="cursor-pointer hover:bg-[#ffff00] px-1">{p.title}</span>
+                        <span key={p.id} onClick={() => onNavigate && onNavigate(p.id)} className="cursor-pointer hover:bg-[var(--site-primary)] px-1 transition-colors">{p.title}</span>
                     ))}
                 </div>
                 <button 
@@ -223,7 +281,7 @@ const ImpactTheme: React.FC<ThemeProps> = ({ site, activePage, packages, users, 
                         const widget = document.getElementById('booking-widget');
                         if(widget) widget.scrollIntoView({ behavior: 'smooth' });
                     }}
-                    className="bg-[#dc2626] text-white px-4 py-2 font-black uppercase text-sm hover:bg-red-700 transition-colors"
+                    className="bg-[#dc2626] text-white px-4 py-2 font-black uppercase text-sm hover:bg-red-700 transition-colors shadow-[2px_2px_0_0_black]"
                 >
                     Book Now
                 </button>

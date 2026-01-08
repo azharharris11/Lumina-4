@@ -14,16 +14,21 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ bookings, packages, trans
   const filteredData = useMemo(() => {
       const now = new Date();
       let startDate = new Date();
-      let endDate = new Date();
+      let endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Default to end of current month
 
       if (timeRange === 'MONTH') {
           startDate.setMonth(now.getMonth());
-          startDate.setDate(1); // 1st of this month
-          endDate.setMonth(now.getMonth() + 1);
-          endDate.setDate(0); // Last of this month
+          startDate.setDate(1);
       }
-      else if (timeRange === 'QUARTER') startDate.setMonth(now.getMonth() - 3);
-      else if (timeRange === 'YEAR') startDate.setFullYear(now.getFullYear() - 1);
+      else if (timeRange === 'QUARTER') {
+          startDate.setMonth(now.getMonth() - 3);
+          startDate.setDate(1);
+      }
+      else if (timeRange === 'YEAR') {
+          startDate.setFullYear(now.getFullYear() - 1);
+          startDate.setMonth(0);
+          startDate.setDate(1);
+      }
 
       // Filter logic
       const inRangeBookings = bookings.filter(b => {
@@ -56,29 +61,35 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ bookings, packages, trans
   
   // -- REAL TIME CALCULATIONS --
   
-  // UPDATED: Use Transactions for Cash Flow Trend
+  // UPDATED: Use Transactions for Cash Flow Trend with proper sorting
   const cashFlowTrendData = useMemo(() => {
       const data: any[] = [];
-      const periodMap = new Map<string, number>();
+      const periodMap = new Map<string, { value: number, sortKey: number }>();
       
       filteredData.transactions.forEach(t => {
           if (t.type !== 'INCOME') return;
           const date = new Date(t.date);
-          const key = timeRange === 'MONTH' 
-            ? `d${date.getDate()}` 
-            : date.toLocaleString('default', { month: 'short' });
+          
+          let key = "";
+          let sortKey = 0;
+
+          if (timeRange === 'MONTH') {
+              key = `d${date.getDate()}`;
+              sortKey = date.getDate();
+          } else {
+              key = date.toLocaleString('default', { month: 'short' });
+              sortKey = date.getMonth() + (date.getFullYear() * 12);
+          }
             
-          periodMap.set(key, (periodMap.get(key) || 0) + t.amount);
+          const current = periodMap.get(key) || { value: 0, sortKey };
+          periodMap.set(key, { value: current.value + t.amount, sortKey });
       });
 
       if (periodMap.size === 0) {
            data.push({name: 'No Data', revenue: 0});
       } else {
-           const sortedKeys = Array.from(periodMap.keys()).sort((a,b) => {
-               if (a.startsWith('d')) return parseInt(a.substring(1)) - parseInt(b.substring(1));
-               return 0;
-           });
-           sortedKeys.forEach(key => data.push({ name: key, revenue: periodMap.get(key) }));
+           const sortedEntries = Array.from(periodMap.entries()).sort((a,b) => a[1].sortKey - b[1].sortKey);
+           sortedEntries.forEach(([name, info]) => data.push({ name, revenue: info.value }));
       }
       
       return data;
@@ -93,10 +104,16 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ bookings, packages, trans
 
   const COLORS = ['#bef264', '#34d399', '#60a5fa', '#f43f5e', '#a78bfa'];
 
-  // Studio Utilization (Hours)
+  // Studio Utilization (Hours) - Dynamic from current bookings
   const studioUtil = useMemo(() => {
-      const studios = ['STUDIO A', 'STUDIO B', 'OUTDOOR'];
-      const studioHours = studios.map(s => {
+      // Find all unique studios present in bookings or config
+      const studioNames = Array.from(new Set([
+          ...filteredData.bookings.map(b => b.studio),
+          // Add config rooms if available to show 0% utilization
+          ...(filteredData.bookings.length === 0 ? ['Main Studio'] : [])
+      ])).filter(Boolean);
+
+      const studioHours = studioNames.map(s => {
           const hours = filteredData.bookings
             .filter(b => b.studio === s)
             .reduce((acc, b) => acc + b.duration, 0);
@@ -107,7 +124,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ bookings, packages, trans
           name: s.name,
           value: Math.round((s.hours / totalHours) * 100),
           hours: s.hours
-      }));
+      })).sort((a,b) => b.hours - a.hours);
   }, [filteredData.bookings]);
 
   // --- P&L DETAILED CALCULATIONS ---

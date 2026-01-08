@@ -5,6 +5,11 @@ import { SiteConfig, Package, User, SiteGalleryItem, StudioConfig, PublicBooking
 import BookingWidget from '../BookingWidget';
 import MasonryGallery from '../MasonryGallery';
 import Lightbox from '../Lightbox';
+import ContactBlock from '../blocks/ContactBlock';
+import TeamBlock from '../blocks/TeamBlock';
+import VideoBlock from '../blocks/VideoBlock';
+import RichTextBlock from '../blocks/RichTextBlock';
+import ServicesBlock from '../blocks/ServicesBlock';
 
 const Motion = motion as any;
 
@@ -68,18 +73,72 @@ const CinemaTheme: React.FC<ThemeProps> = ({ site, activePage, packages, users, 
                     <MasonryGallery images={site.gallery} onImageClick={setLightboxSrc} columns={3} />
                 </section>
             );
+            case 'CONTACT_FORM': return (
+                <ContactBlock 
+                    key={section.id}
+                    headline={section.content.headline}
+                    description={section.content.description}
+                    className="bg-black text-white"
+                    titleClassName="text-blue-500 font-bold tracking-tighter"
+                    inputClassName="bg-[#111] border-[#333] text-white focus:border-blue-500"
+                    buttonClassName="bg-blue-600 text-white hover:bg-blue-500"
+                />
+            );
+            case 'TEAM_GRID': 
+                const members = (section.content.items && section.content.items.length > 0) 
+                    ? section.content.items.map((item, idx) => ({ id: `manual-${idx}`, name: item.title, role: item.text, image: item.image || '' }))
+                    : users.filter(u => u.status === 'ACTIVE').map(u => ({ id: u.id, name: u.name, role: u.role, image: u.avatar }));
+                
+                return (
+                    <TeamBlock 
+                        key={section.id}
+                        headline={section.content.headline}
+                        description={section.content.description}
+                        members={members}
+                        className="bg-black text-white"
+                        titleClassName="text-blue-500 font-bold tracking-tighter"
+                        cardClassName="bg-[#111] p-4 rounded-xl border border-[#333]"
+                    />
+                );
+            case 'VIDEO_EMBED': return (
+                <VideoBlock 
+                    key={section.id}
+                    headline={section.content.headline}
+                    description={section.content.description}
+                    videoUrl={section.content.videoUrl || ''}
+                    className="bg-black text-white"
+                    titleClassName="text-blue-500 font-bold tracking-tighter"
+                />
+            );
+            case 'RICH_TEXT': return (
+                <RichTextBlock 
+                    key={section.id}
+                    html={section.content.html || ''}
+                    className="bg-black prose-invert prose-headings:text-blue-500"
+                />
+            );
+            case 'FEATURES': return (
+                <ServicesBlock 
+                   key={section.id}
+                   headline={section.content.headline}
+                   items={section.content.items || []}
+                   className="bg-black text-white"
+                   titleClassName="text-blue-500 font-bold tracking-tighter"
+                   itemClassName="bg-[#111] border border-[#333] p-6 rounded-xl hover:border-blue-500/50 transition-colors"
+               />
+            );
             default: return null;
         }
     });
 
     return (
-        <div className="bg-black text-white font-sans min-h-full overflow-x-hidden">
-            <nav className="absolute top-0 left-0 right-0 z-50 p-6 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
+        <div className="bg-[var(--site-bg)] text-[var(--site-text)] font-sans min-h-full overflow-x-hidden transition-colors duration-300">
+            <nav className="absolute top-0 left-0 right-0 z-50 p-6 flex justify-between items-center bg-gradient-to-b from-[var(--site-bg)]/80 to-transparent">
                 <span onClick={() => onNavigate && onNavigate('HOME')} className="font-bold tracking-widest uppercase text-sm cursor-pointer">{site.title}</span>
-                <div className="hidden md:flex gap-6 text-xs font-bold uppercase tracking-widest text-gray-400">
-                    <button onClick={() => onNavigate && onNavigate('HOME')} className="hover:text-white transition-colors">Home</button>
+                <div className="hidden md:flex gap-6 text-xs font-bold uppercase tracking-widest opacity-60">
+                    <button onClick={() => onNavigate && onNavigate('HOME')} className="hover:opacity-100 transition-colors">Home</button>
                     {site.pages?.map(p => (
-                        <button key={p.id} onClick={() => onNavigate && onNavigate(p.id)} className="hover:text-white transition-colors">{p.title}</button>
+                        <button key={p.id} onClick={() => onNavigate && onNavigate(p.id)} className="hover:opacity-100 transition-colors">{p.title}</button>
                     ))}
                 </div>
             </nav>

@@ -28,16 +28,18 @@ const MonthView: React.FC<MonthViewProps> = ({ currentDate, bookings, rooms, onD
     const daySlots = Array.from({ length: days }, (_, i) => i + 1);
 
     return (
-        <div className="flex-1 bg-lumina-surface border border-lumina-highlight rounded-2xl p-6 flex flex-col overflow-hidden min-w-[600px]">
-            <div className="grid grid-cols-7 mb-2">
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-                    <div key={d} className="text-center text-xs font-bold text-lumina-muted uppercase">{d}</div>
-                ))}
-            </div>
-            <div className="grid grid-cols-7 grid-rows-6 gap-2 flex-1">
-                {blanks.map(b => <div key={`blank-${b}`} className="bg-transparent"></div>)}
-                
-                {daySlots.map(day => {
+        <div className="flex-1 bg-lumina-surface border border-lumina-highlight rounded-2xl p-6 flex flex-col overflow-hidden">
+            <div className="overflow-x-auto custom-scrollbar">
+                <div className="min-w-[600px] h-full flex flex-col">
+                    <div className="grid grid-cols-7 mb-2">
+                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                            <div key={d} className="text-center text-xs font-bold text-lumina-muted uppercase">{d}</div>
+                        ))}
+                    </div>
+                    <div className="grid grid-cols-7 grid-rows-6 gap-2 flex-1 min-h-[500px]">
+                        {blanks.map(b => <div key={`blank-${b}`} className="bg-transparent"></div>)}
+                        
+                        {daySlots.map(day => {
                     const d = new Date(year, month, day);
                     // Handle timezone offset to avoid date shifting
                     const offsetDate = new Date(d.getTime() - (d.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
@@ -75,6 +77,8 @@ const MonthView: React.FC<MonthViewProps> = ({ currentDate, bookings, rooms, onD
                         </div>
                     );
                 })}
+                    </div>
+                </div>
             </div>
         </div>
     );

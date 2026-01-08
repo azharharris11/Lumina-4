@@ -2,12 +2,21 @@
 import React, { useState } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { SiteConfig, Package, User, SiteSection, StudioConfig, PublicBookingSubmission, SitePage } from '../../../types';
-import ScrollReveal from '../ScrollReveal';
-import BeforeAfterSlider from '../BeforeAfterSlider';
 import BookingWidget from '../BookingWidget';
-import MasonryGallery from '../MasonryGallery';
 import Lightbox from '../Lightbox';
 import { Play } from 'lucide-react';
+
+// Blocks
+import HeroBlock from '../blocks/HeroBlock';
+import GalleryBlock from '../blocks/GalleryBlock';
+import FeaturesBlock from '../blocks/FeaturesBlock';
+import PricingBlock from '../blocks/PricingBlock';
+import CtaBlock from '../blocks/CtaBlock';
+import LocationBlock from '../blocks/LocationBlock';
+import ContactBlock from '../blocks/ContactBlock';
+import TeamBlock from '../blocks/TeamBlock';
+import VideoBlock from '../blocks/VideoBlock';
+import RichTextBlock from '../blocks/RichTextBlock';
 
 const Motion = motion as any;
 
@@ -23,8 +32,7 @@ interface ThemeProps {
 
 const NoirTheme: React.FC<ThemeProps> = ({ site, activePage, packages, users, config, onBooking, onNavigate }) => {
     const { scrollY } = useScroll();
-    // Using CSS variables for colors, set via parent context/CSS injection
-    const navBackground = useTransform(scrollY, [0, 100], ['rgba(0,0,0,0)', 'var(--site-bg)']); // Fallback to black if var not set handled in CSS
+    const navBackground = useTransform(scrollY, [0, 100], ['rgba(0,0,0,0)', 'var(--site-bg)']);
     const navBackdrop = useTransform(scrollY, [0, 100], ['blur(0px)', 'blur(12px)']);
     
     const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
@@ -32,122 +40,146 @@ const NoirTheme: React.FC<ThemeProps> = ({ site, activePage, packages, users, co
     const data = activePage || site; 
     const sections = (data as SitePage).sections || [];
 
-    // --- RENDERERS ---
+    const scrollToBooking = () => {
+        const w = document.getElementById('booking-widget');
+        if(w) w.scrollIntoView({behavior:'smooth'});
+    };
 
     const renderHero = (headline: string, desc: string, img: string, sub?: string, videoUrl?: string) => (
-        <header className="relative min-h-[90vh] flex flex-col justify-center overflow-hidden">
-            <div className="absolute inset-0 z-0">
-                {videoUrl ? (
-                    <video autoPlay loop muted playsInline className="w-full h-full object-cover opacity-50">
-                        <source src={videoUrl} type="video/mp4" />
-                    </video>
-                ) : (
-                    <Motion.img 
-                        initial={{ scale: 1.1 }} animate={{ scale: 1 }} transition={{ duration: 2 }}
-                        src={img} className="w-full h-full object-cover opacity-60" 
-                    />
-                )}
-                {/* Gradient uses CSS var for background color to blend properly */}
-                <div className="absolute inset-0 bg-gradient-to-t from-[var(--site-bg)] via-[var(--site-bg)]/40 to-transparent"></div>
-            </div>
-            
-            <div className="relative z-10 px-6 md:px-12 max-w-7xl mx-auto w-full pt-20">
-                <div className="max-w-4xl">
-                    {sub && (
-                        <Motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} className="flex items-center gap-4 mb-6">
-                            <div className="h-[1px] w-12 bg-[var(--site-text)] opacity-50"></div>
-                            <p className="text-xs md:text-sm font-bold uppercase tracking-[0.3em] text-[var(--site-text)] opacity-70">{sub}</p>
-                        </Motion.div>
-                    )}
-                    <Motion.h1 
-                        initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.8 }}
-                        className="text-[clamp(3rem,8vw,8rem)] font-heading font-bold leading-[0.9] tracking-tighter text-[var(--site-text)] mb-8"
-                        style={{ fontFamily: 'var(--site-font-heading)' }}
-                    >
-                        {headline}
-                    </Motion.h1>
-                    <Motion.p 
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}
-                        className="text-[var(--site-text)] opacity-80 text-lg md:text-2xl font-light max-w-xl leading-relaxed mb-10"
-                        style={{ fontFamily: 'var(--site-font-body)' }}
-                    >
-                        {desc}
-                    </Motion.p>
-                    <Motion.button 
-                        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }}
-                        onClick={() => { const w = document.getElementById('booking-widget'); if(w) w.scrollIntoView({behavior:'smooth'}); }}
-                        className="group flex items-center gap-4 text-[var(--site-text)] text-sm font-bold uppercase tracking-widest hover:opacity-70 transition-opacity"
-                    >
-                        <span className="w-12 h-12 rounded-full border border-[var(--site-text)]/30 flex items-center justify-center group-hover:bg-[var(--site-text)] group-hover:text-[var(--site-bg)] transition-all">
-                            <Play size={14} fill="currentColor" />
-                        </span>
-                        Start Project
-                    </Motion.button>
-                </div>
-            </div>
-        </header>
+        <HeroBlock 
+            layout="FULL"
+            headline={headline}
+            description={desc}
+            subheadline={sub}
+            image={img}
+            videoUrl={videoUrl}
+            onButtonClick={scrollToBooking}
+            titleClassName="text-[clamp(3rem,8vw,8rem)] font-heading font-bold leading-[0.9] tracking-tighter text-[var(--site-text)]"
+            titleStyle={{ fontFamily: 'var(--site-font-heading)' }}
+            descClassName="text-[var(--site-text)] opacity-80 text-lg md:text-2xl font-light leading-relaxed"
+            descStyle={{ fontFamily: 'var(--site-font-body)' }}
+            buttonClassName="group flex items-center gap-4 text-[var(--site-text)] text-sm font-bold uppercase tracking-widest hover:opacity-70"
+            buttonText={
+                <>
+                    <span className="w-12 h-12 rounded-full border border-[var(--site-text)]/30 flex items-center justify-center group-hover:bg-[var(--site-text)] group-hover:text-[var(--site-bg)] transition-all">
+                        <Play size={14} fill="currentColor" />
+                    </span>
+                    Start Project
+                </>
+            }
+            overlay={<div className="absolute inset-0 bg-gradient-to-t from-[var(--site-bg)] via-[var(--site-bg)]/40 to-transparent"></div>}
+        />
     );
 
     const renderSections = () => sections.map((section: SiteSection) => {
         switch(section.type) {
             case 'HERO': return <div key={section.id}>{renderHero(section.content.headline || '', section.content.description || '', section.content.image || '', section.content.subheadline, section.content.videoUrl)}</div>;
             case 'GALLERY': return (
-                <section key={section.id} className="py-24 px-6 md:px-12 bg-[var(--site-bg)]">
-                    <h2 className="text-[clamp(2rem,4vw,4rem)] font-heading font-bold mb-12 text-center text-[var(--site-text)]" style={{ fontFamily: 'var(--site-font-heading)' }}>Selected Works</h2>
-                    <MasonryGallery images={site.gallery} onImageClick={setLightboxSrc} columns={3} />
-                </section>
+                <GalleryBlock 
+                    key={section.id}
+                    headline="Selected Works"
+                    images={site.gallery}
+                    onImageClick={setLightboxSrc}
+                    titleClassName="text-[clamp(2rem,4vw,4rem)] font-heading font-bold text-[var(--site-text)]"
+                    titleStyle={{ fontFamily: 'var(--site-font-heading)' }}
+                />
             );
             case 'MAP_LOCATION': return (
-                <section key={section.id} className="h-[500px] w-full relative grayscale invert filter contrast-125">
-                    <div className="w-full h-full bg-gray-800 flex items-center justify-center relative overflow-hidden">
-                        <div className="absolute inset-0 bg-[radial-gradient(#333_1px,transparent_1px)] [background-size:20px_20px]"></div>
-                        <div className="bg-black text-white p-6 rounded-xl border border-white/10 relative z-10 text-center filter invert-0 grayscale-0">
-                            <div className="text-3xl mb-2">📍</div>
-                            <h3 className="font-bold text-xl mb-1">{config.name}</h3>
-                            <p className="text-gray-400 text-sm">{config.address}</p>
-                            <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(config.address)}`} target="_blank" className="mt-4 inline-block text-xs font-bold uppercase border-b border-white pb-1">Open in Maps</a>
-                        </div>
-                    </div>
-                </section>
+                <LocationBlock 
+                    key={section.id}
+                    name={config.name}
+                    address={config.address}
+                />
             );
             case 'TEXT_IMAGE': return (
-                <section key={section.id} className="py-24 px-6 md:px-12 border-t border-[var(--site-text)]/10">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
-                        <div className={section.content.layout === 'RIGHT' ? 'order-1' : 'order-2'}>
-                            <h2 className="text-[clamp(2.5rem,5vw,5rem)] font-heading font-bold leading-none mb-8 text-[var(--site-text)]" style={{ fontFamily: 'var(--site-font-heading)' }}>{section.content.headline}</h2>
-                            <p className="text-[var(--site-text)] opacity-70 text-lg leading-relaxed" style={{ fontFamily: 'var(--site-font-body)' }}>{section.content.description}</p>
-                        </div>
-                        <div className={`${section.content.layout === 'RIGHT' ? 'order-2' : 'order-1'} aspect-[4/5]`}>
-                            <ScrollReveal><img src={section.content.image} className="w-full h-full object-cover" /></ScrollReveal>
-                        </div>
-                    </div>
-                </section>
+                <FeaturesBlock 
+                    key={section.id}
+                    headline={section.content.headline}
+                    description={section.content.description}
+                    image={section.content.image}
+                    imagePosition={section.content.layout === 'RIGHT' ? 'RIGHT' : 'LEFT'}
+                    className="border-t border-[var(--site-text)]/10"
+                    titleClassName="text-[clamp(2.5rem,5vw,5rem)] font-heading font-bold leading-none text-[var(--site-text)]"
+                    titleStyle={{ fontFamily: 'var(--site-font-heading)' }}
+                    descClassName="text-[var(--site-text)] opacity-70 text-lg"
+                    descStyle={{ fontFamily: 'var(--site-font-body)' }}
+                />
             );
             case 'PRICING': return (
-                <section key={section.id} className="py-24 px-6 md:px-12 bg-[var(--site-bg)]">
-                    <h2 className="text-center text-4xl font-heading font-bold mb-16 text-[var(--site-text)]" style={{ fontFamily: 'var(--site-font-heading)' }}>{section.content.headline}</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-[var(--site-text)]/10 border border-[var(--site-text)]/10">
-                        {packages.filter(p=>p.active).map(p => (
-                            <div key={p.id} className="bg-[var(--site-bg)] p-8 md:p-12 hover:bg-[var(--site-text)]/5 transition-colors group">
-                                <h3 className="text-2xl font-bold mb-2 text-[var(--site-text)]">{p.name}</h3>
-                                <p className="text-[var(--site-text)] opacity-50 mb-8 h-12 text-sm">{p.features.slice(0,2).join(', ')}</p>
-                                <p className="text-3xl font-mono text-[var(--site-text)] mb-8">Rp {(p.price/1000000).toFixed(1)}</p>
-                                <button onClick={() => { const w = document.getElementById('booking-widget'); if(w) w.scrollIntoView({behavior:'smooth'}); }} className="w-full py-4 border border-[var(--site-text)]/20 text-xs font-bold uppercase tracking-widest text-[var(--site-text)] hover:bg-[var(--site-text)] hover:text-[var(--site-bg)] transition-all">Select</button>
-                            </div>
-                        ))}
-                    </div>
-                </section>
+                <PricingBlock 
+                    key={section.id}
+                    headline={section.content.headline}
+                    packages={packages}
+                    className="bg-[var(--site-bg)]"
+                    titleClassName="font-heading font-bold text-[var(--site-text)] text-4xl"
+                    titleStyle={{ fontFamily: 'var(--site-font-heading)' }}
+                    itemClassName="bg-[var(--site-bg)] p-8 md:p-12 hover:bg-[var(--site-text)]/5 transition-colors border-none"
+                />
             );
             case 'CTA_BANNER': return (
-                <section key={section.id} className="py-32 px-6 text-center border-t border-[var(--site-text)]/10">
-                    <h2 className="text-[clamp(3rem,6vw,6rem)] font-heading font-bold mb-8 text-[var(--site-text)]" style={{ fontFamily: 'var(--site-font-heading)' }}>{section.content.headline}</h2>
-                    <button 
-                        onClick={() => { const w = document.getElementById('booking-widget'); if(w) w.scrollIntoView({behavior:'smooth'}); }} 
-                        className="px-12 py-5 bg-[var(--site-text)] text-[var(--site-bg)] font-bold uppercase tracking-widest hover:opacity-80 transition-colors text-sm md:text-base"
-                    >
-                        {section.content.buttonText}
-                    </button>
-                </section>
+                <CtaBlock 
+                    key={section.id}
+                    headline={section.content.headline || ''}
+                    buttonText={section.content.buttonText}
+                    onButtonClick={scrollToBooking}
+                    className="border-t border-[var(--site-text)]/10"
+                    titleClassName="text-[clamp(3rem,6vw,6rem)] font-heading font-bold text-[var(--site-text)]"
+                    titleStyle={{ fontFamily: 'var(--site-font-heading)' }}
+                    buttonClassName="bg-[var(--site-text)] text-[var(--site-bg)] hover:opacity-80 md:text-base"
+                />
+            );
+            case 'CONTACT_FORM': return (
+                <ContactBlock 
+                    key={section.id}
+                    headline={section.content.headline}
+                    description={section.content.description}
+                    className="border-t border-[var(--site-text)]/10"
+                    titleClassName="text-[clamp(2.5rem,5vw,5rem)] font-heading font-bold text-[var(--site-text)]"
+                    titleStyle={{ fontFamily: 'var(--site-font-heading)' }}
+                    descClassName="text-[var(--site-text)]"
+                    descStyle={{ fontFamily: 'var(--site-font-body)' }}
+                    inputClassName="text-[var(--site-text)] border-[var(--site-text)] placeholder-[var(--site-text)]/50"
+                    buttonClassName="bg-[var(--site-text)] text-[var(--site-bg)]"
+                />
+            );
+            case 'TEAM_GRID': 
+                const members = (section.content.items && section.content.items.length > 0) 
+                    ? section.content.items.map((item, idx) => ({ id: `manual-${idx}`, name: item.title, role: item.text, image: item.image || '' }))
+                    : users.filter(u => u.status === 'ACTIVE').map(u => ({ id: u.id, name: u.name, role: u.role, image: u.avatar }));
+                
+                return (
+                    <TeamBlock 
+                        key={section.id}
+                        headline={section.content.headline}
+                        description={section.content.description}
+                        members={members}
+                        className="bg-[var(--site-bg)]"
+                        titleClassName="text-[clamp(2.5rem,5vw,5rem)] font-heading font-bold text-[var(--site-text)]"
+                        titleStyle={{ fontFamily: 'var(--site-font-heading)' }}
+                        descClassName="text-[var(--site-text)]"
+                        descStyle={{ fontFamily: 'var(--site-font-body)' }}
+                    />
+                );
+            case 'VIDEO_EMBED': return (
+                <VideoBlock 
+                    key={section.id}
+                    headline={section.content.headline}
+                    description={section.content.description}
+                    videoUrl={section.content.videoUrl || ''}
+                    className="border-t border-[var(--site-text)]/10"
+                    titleClassName="text-[clamp(2.5rem,5vw,5rem)] font-heading font-bold text-[var(--site-text)]"
+                    titleStyle={{ fontFamily: 'var(--site-font-heading)' }}
+                    descClassName="text-[var(--site-text)]"
+                    descStyle={{ fontFamily: 'var(--site-font-body)' }}
+                />
+            );
+            case 'RICH_TEXT': return (
+                <RichTextBlock 
+                    key={section.id}
+                    html={section.content.html || ''}
+                    className="prose-headings:font-heading prose-headings:text-[var(--site-text)] prose-p:text-[var(--site-text)] prose-a:text-[var(--site-text)] prose-strong:text-[var(--site-text)]"
+                    style={{ fontFamily: 'var(--site-font-body)' }}
+                />
             );
             default: return null;
         }

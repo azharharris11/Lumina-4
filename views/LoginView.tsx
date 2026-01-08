@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { User } from '../types';
 import { Aperture, ArrowRight, Lock, Mail, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
-import { auth, googleProvider, signInWithEmailAndPassword, signInWithPopup } from '../firebase';
+import { auth, googleProvider, GoogleAuthProvider, signInWithEmailAndPassword, signInWithPopup } from '../firebase';
 
 const Motion = motion as any;
 
@@ -47,7 +47,18 @@ const LoginView: React.FC<LoginViewProps> = ({ users, onLogin, onRegisterLink, o
       setError(null);
       setIsLoading(true);
       try {
-          await signInWithPopup(auth, googleProvider);
+          // Request scopes for Drive and Calendar
+          googleProvider.addScope('https://www.googleapis.com/auth/drive');
+          googleProvider.addScope('https://www.googleapis.com/auth/calendar');
+          
+          const result = await signInWithPopup(auth, googleProvider);
+          const credential = GoogleAuthProvider.credentialFromResult(result);
+          const token = credential?.accessToken;
+          
+          if (token) {
+              sessionStorage.setItem('lumina_g_token', token);
+          }
+
           // App.tsx will handle the rest via onAuthStateChanged
       } catch (err: any) {
           console.error("Google Login Error:", err);

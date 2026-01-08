@@ -5,6 +5,11 @@ import { SiteConfig, Package, User, SiteGalleryItem, SiteTestimonial, SiteFAQ, S
 import ScrollReveal from '../ScrollReveal';
 import BeforeAfterSlider from '../BeforeAfterSlider';
 import BookingWidget from '../BookingWidget';
+import ContactBlock from '../blocks/ContactBlock';
+import TeamBlock from '../blocks/TeamBlock';
+import VideoBlock from '../blocks/VideoBlock';
+import RichTextBlock from '../blocks/RichTextBlock';
+import GalleryBlock from '../blocks/GalleryBlock';
 
 const Motion = motion as any;
 
@@ -104,19 +109,70 @@ const AtelierTheme: React.FC<ThemeProps> = ({ site, activePage, packages, users,
             case 'TEXT_IMAGE': return <div key={section.id}>{renderTextImage(section.content.headline || '', section.content.description || '', section.content.image || '', section.content.layout || 'LEFT')}</div>;
             case 'FEATURES': return <div key={section.id}>{renderFeatures(section.content.headline || 'Features', section.content.items || [])}</div>;
             case 'PRICING': return <div key={section.id}>{renderPricing(section.content.headline || 'Investment')}</div>;
+            case 'CONTACT_FORM': return (
+                <ContactBlock 
+                    key={section.id}
+                    headline={section.content.headline}
+                    description={section.content.description}
+                    className="bg-white"
+                    titleClassName="font-serif italic text-[#2c2c2c]"
+                    buttonClassName="bg-[#2c2c2c] text-white tracking-widest text-xs"
+                />
+            );
+            case 'TEAM_GRID': 
+                const members = (section.content.items && section.content.items.length > 0) 
+                    ? section.content.items.map((item, idx) => ({ id: `manual-${idx}`, name: item.title, role: item.text, image: item.image || '' }))
+                    : users.filter(u => u.status === 'ACTIVE').map(u => ({ id: u.id, name: u.name, role: u.role, image: u.avatar }));
+                
+                return (
+                    <TeamBlock 
+                        key={section.id}
+                        headline={section.content.headline}
+                        description={section.content.description}
+                        members={members}
+                        className="bg-[#f5f0eb]"
+                        titleClassName="font-serif italic text-[#2c2c2c]"
+                        cardClassName="text-center"
+                    />
+                );
+            case 'VIDEO_EMBED': return (
+                <VideoBlock 
+                    key={section.id}
+                    headline={section.content.headline}
+                    description={section.content.description}
+                    videoUrl={section.content.videoUrl || ''}
+                    titleClassName="font-serif italic text-[#2c2c2c]"
+                />
+            );
+            case 'RICH_TEXT': return (
+                <RichTextBlock 
+                    key={section.id}
+                    html={section.content.html || ''}
+                    className="prose-headings:font-serif prose-headings:italic prose-p:text-[#666]"
+                />
+            );
+            case 'GALLERY': return (
+                <GalleryBlock 
+                   key={section.id}
+                   headline={section.content.headline}
+                   images={site.gallery}
+                   className="bg-white"
+                   titleClassName="font-serif italic text-[#2c2c2c]"
+               />
+            );
             default: return null;
         }
     });
 
     return (
-        <div className="bg-[#f5f0eb] text-[#2c2c2c] font-serif min-h-full selection:bg-[#d4c5b5] selection:text-white overflow-x-hidden">
-            <nav className="flex flex-col items-center py-8 md:py-12 border-b border-[#d4c5b5]/30">
-                <span className="text-[10px] md:text-sm uppercase tracking-[0.3em] mb-2 md:mb-4">Est. 2024</span>
+        <div className="bg-[var(--site-bg)] text-[var(--site-text)] font-serif min-h-full selection:bg-[var(--site-primary)] selection:text-[var(--site-bg)] overflow-x-hidden transition-colors duration-300">
+            <nav className="flex flex-col items-center py-8 md:py-12 border-b border-[var(--site-text)]/10">
+                <span className="text-[10px] md:text-sm uppercase tracking-[0.3em] mb-2 md:mb-4 opacity-50">Est. 2024</span>
                 <span onClick={() => onNavigate && onNavigate('HOME')} className="text-2xl md:text-4xl font-serif tracking-tight text-center cursor-pointer">{site.title}</span>
-                <div className="mt-6 md:mt-8 flex gap-6 md:gap-8 text-[10px] md:text-xs uppercase tracking-widest text-[#666]">
-                    <span onClick={() => onNavigate && onNavigate('HOME')} className="hover:text-black cursor-pointer transition-colors">Home</span>
+                <div className="mt-6 md:mt-8 flex gap-6 md:gap-8 text-[10px] md:text-xs uppercase tracking-widest opacity-60">
+                    <span onClick={() => onNavigate && onNavigate('HOME')} className="hover:opacity-100 cursor-pointer transition-opacity">Home</span>
                     {site.pages?.map(p => (
-                        <span key={p.id} onClick={() => onNavigate && onNavigate(p.id)} className="hover:text-black cursor-pointer transition-colors">{p.title}</span>
+                        <span key={p.id} onClick={() => onNavigate && onNavigate(p.id)} className="hover:opacity-100 cursor-pointer transition-opacity">{p.title}</span>
                     ))}
                 </div>
             </nav>

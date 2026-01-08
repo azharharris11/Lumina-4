@@ -4,6 +4,11 @@ import { motion } from 'framer-motion';
 import { SiteConfig, Package, User, SiteGalleryItem, StudioConfig, PublicBookingSubmission, SitePage, SiteSection, SiteFAQ } from '../../../types';
 import BookingWidget from '../BookingWidget';
 import { ShieldCheck, Check, Star, HelpCircle, ArrowRight, Lock } from 'lucide-react';
+import ContactBlock from '../blocks/ContactBlock';
+import TeamBlock from '../blocks/TeamBlock';
+import VideoBlock from '../blocks/VideoBlock';
+import RichTextBlock from '../blocks/RichTextBlock';
+import GalleryBlock from '../blocks/GalleryBlock';
 
 const Motion = motion as any;
 
@@ -203,18 +208,61 @@ const CleanSlateTheme: React.FC<ThemeProps> = ({ site, activePage, packages, use
                 case 'PRICING': return <div key={section.id}>{renderPricing(section.content.headline || 'Pricing')}</div>;
                 case 'FAQ': return <div key={section.id}>{renderFAQ(section.content.headline || 'FAQ', site.faq)}</div>; // Using global FAQ for now
                 case 'CTA_BANNER': return <div key={section.id}>{renderCTA(section.content.headline || 'Ready?', section.content.buttonText || 'Book Now')}</div>;
+                case 'CONTACT_FORM': return (
+                    <ContactBlock 
+                        key={section.id}
+                        headline={section.content.headline}
+                        description={section.content.description}
+                        className="bg-white border-t border-slate-100"
+                        titleClassName="text-slate-900 font-bold"
+                        descClassName="text-slate-600"
+                        inputClassName="bg-slate-50 border-slate-200 text-slate-900 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                        buttonClassName="bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-md"
+                    />
+                );
+                case 'TEAM_GRID': 
+                    const members = (section.content.items && section.content.items.length > 0) 
+                        ? section.content.items.map((item, idx) => ({ id: `manual-${idx}`, name: item.title, role: item.text, image: item.image || '' }))
+                        : users.filter(u => u.status === 'ACTIVE').map(u => ({ id: u.id, name: u.name, role: u.role, image: u.avatar }));
+                    
+                    return (
+                        <TeamBlock 
+                            key={section.id}
+                            headline={section.content.headline}
+                            description={section.content.description}
+                            members={members}
+                            className="bg-slate-50"
+                            titleClassName="text-slate-900 font-bold"
+                            descClassName="text-slate-600"
+                            cardClassName="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow"
+                        />
+                    );
+                case 'VIDEO_EMBED': return (
+                    <VideoBlock 
+                        key={section.id}
+                        headline={section.content.headline}
+                        description={section.content.description}
+                        videoUrl={section.content.videoUrl || ''}
+                        titleClassName="text-slate-900 font-bold"
+                        descClassName="text-slate-600"
+                    />
+                );
+                case 'RICH_TEXT': return (
+                    <RichTextBlock 
+                        key={section.id}
+                        html={section.content.html || ''}
+                        className="prose-slate"
+                    />
+                );
                 case 'GALLERY': 
                     return (
-                        <section key={section.id} className="py-20 px-6 bg-white">
-                            <h2 className="text-3xl font-bold text-center mb-12">Gallery</h2>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-6xl mx-auto">
-                                {site.gallery.map(img => (
-                                    <div key={img.id} className="rounded-xl overflow-hidden aspect-square shadow-md">
-                                        <img src={img.url} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
-                                    </div>
-                                ))}
-                            </div>
-                        </section>
+                        <GalleryBlock 
+                            key={section.id}
+                            headline={section.content.headline}
+                            images={site.gallery}
+                            className="bg-white"
+                            titleClassName="text-slate-900 font-bold"
+                        />
                     );
                 default: return null;
             }
@@ -222,13 +270,13 @@ const CleanSlateTheme: React.FC<ThemeProps> = ({ site, activePage, packages, use
     };
 
     return (
-        <div className="bg-white text-slate-900 font-sans min-h-full overflow-x-hidden">
-            <nav className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-slate-100 z-50 px-6 py-4 flex justify-between items-center">
-                <span onClick={() => onNavigate && onNavigate('HOME')} className="font-bold text-xl tracking-tight cursor-pointer text-slate-900">{site.title}</span>
-                <div className="hidden md:flex gap-8 text-sm font-medium text-slate-600">
-                    <button onClick={() => onNavigate && onNavigate('HOME')} className="hover:text-indigo-600 transition-colors">Home</button>
+        <div className="bg-[var(--site-bg)] text-[var(--site-text)] font-sans min-h-full overflow-x-hidden transition-colors duration-300">
+            <nav className="sticky top-0 bg-[var(--site-bg)]/80 backdrop-blur-md border-b border-[var(--site-text)]/5 z-50 px-6 py-4 flex justify-between items-center">
+                <span onClick={() => onNavigate && onNavigate('HOME')} className="font-bold text-xl tracking-tight cursor-pointer">{site.title}</span>
+                <div className="hidden md:flex gap-8 text-sm font-medium opacity-60">
+                    <button onClick={() => onNavigate && onNavigate('HOME')} className="hover:opacity-100 transition-opacity">Home</button>
                     {site.pages?.map(page => (
-                        <button key={page.id} onClick={() => onNavigate && onNavigate(page.id)} className="hover:text-indigo-600 transition-colors">{page.title}</button>
+                        <button key={page.id} onClick={() => onNavigate && onNavigate(page.id)} className="hover:opacity-100 transition-opacity">{page.title}</button>
                     ))}
                 </div>
                 <button 
@@ -236,7 +284,7 @@ const CleanSlateTheme: React.FC<ThemeProps> = ({ site, activePage, packages, use
                         const widget = document.getElementById('booking-widget');
                         if(widget) widget.scrollIntoView({ behavior: 'smooth' });
                     }}
-                    className="bg-slate-900 text-white px-5 py-2 rounded-lg text-sm font-bold hover:bg-slate-800 transition-colors"
+                    className="bg-[var(--site-text)] text-[var(--site-bg)] px-5 py-2 rounded-lg text-sm font-bold hover:opacity-80 transition-opacity"
                 >
                     Book Now
                 </button>

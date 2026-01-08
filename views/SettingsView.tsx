@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { SettingsViewProps, StudioConfig, Booking, User, Asset } from '../types';
 import { Sliders, Tag, MessageSquare, User as UserIcon, Zap, HardDrive } from 'lucide-react';
+import { functions } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
 
 import GeneralTab from '../components/settings-tabs/GeneralTab';
 import PackagesTab from '../components/settings-tabs/PackagesTab';
@@ -12,62 +14,49 @@ import DataTab from '../components/settings-tabs/DataTab';
 
 interface ExtendedSettingsViewProps extends SettingsViewProps {
     bookings?: Booking[];
-    googleToken?: string | null;
-    setGoogleToken?: (token: string | null) => void;
+    googleToken?: string | null; // Deprecated, kept for compatibility interface
+    setGoogleToken?: (token: string | null) => void; // Deprecated
     assets?: Asset[];
 }
 
-declare var google: any;
-
-const SettingsView: React.FC<ExtendedSettingsViewProps> = ({ packages, config, onAddPackage, onUpdatePackage, onDeletePackage, onUpdateConfig, bookings = [], currentUser, onUpdateUserProfile, onDeleteAccount, googleToken, setGoogleToken, assets = [] }) => {
+const SettingsView: React.FC<ExtendedSettingsViewProps> = ({ packages, config, onAddPackage, onUpdatePackage, onDeletePackage, onUpdateConfig, bookings = [], currentUser, onUpdateUserProfile, onDeleteAccount, assets = [] }) => {
   const [activeTab, setActiveTab] = useState('GENERAL');
   const [localConfig, setLocalConfig] = useState<StudioConfig>(config);
+  
+  // Use the flag from user profile instead of local storage token
+  const isGoogleConnected = currentUser?.isGoogleConnected || false;
 
   useEffect(() => { setLocalConfig(config); }, [config]);
 
-  const loadGoogleScript = () => { 
-      return new Promise((resolve, reject) => { 
-          if (typeof google !== 'undefined' && google.accounts) { 
-              resolve(true); 
-              return; 
-          } 
-          const script = document.createElement('script'); 
-          script.src = 'https://accounts.google.com/gsi/client'; 
-          script.async = true; 
-          script.defer = true; 
-          script.onload = () => resolve(true); 
-          script.onerror = () => reject(new Error("Failed to load Google Identity Services"));
-          document.body.appendChild(script); 
-      }); 
-  };
-  
   const handleConnectGoogle = async () => { 
-      if (googleToken) { 
-          if (window.confirm("Disconnect Google Account?")) { 
-              if(setGoogleToken) setGoogleToken(null); 
-          } 
-          return; 
-      } 
+      if (isGoogleConnected) {
+          if (window.confirm("Are you sure you want to disconnect your Google Account? This will stop calendar syncing and drive access.")) {
+             try {
+                 const disconnectFn = httpsCallable(functions, 'disconnectGoogle');
+                 await disconnectFn();
+                 alert("Google Account disconnected successfully.");
+             } catch (e: any) {
+                 console.error("Disconnect Error:", e);
+                 alert("Failed to disconnect: " + e.message);
+             }
+          }
+          return;
+      }
       
       try {
-          await loadGoogleScript();
+          const getAuthURL = httpsCallable(functions, 'getGoogleAuthURL');
+          const result = await getAuthURL();
+          const { url } = result.data as { url: string };
           
-          if (typeof google === 'undefined' || !google.accounts) {
-              throw new Error("Google Identity Services not initialized. Please refresh and try again.");
-          }
-
-          const CLIENT_ID = '276331844787-lolqnoah70th2mm7jt2ftim37sjilu00.apps.googleusercontent.com'; 
-          const client = google.accounts.oauth2.initTokenClient({ 
-              client_id: CLIENT_ID, 
-              scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/drive', 
-              callback: (tokenResponse: any) => { 
-                  if (tokenResponse && tokenResponse.access_token) { 
-                      if(setGoogleToken) setGoogleToken(tokenResponse.access_token); 
-                      alert("Successfully connected! Session is active."); 
-                  } 
-              }, 
-          }); 
-          client.requestAccessToken(); 
+          // Open popup or redirect
+          // Using a popup for smoother flow
+          const width = 500;
+          const height = 600;
+          const left = (window.screen.width / 2) - (width / 2);
+          const top = (window.screen.height / 2) - (height / 2);
+          
+          window.open(url, "Google Connect", `width=${width},height=${height},top=${top},left=${left}`);
+          
       } catch (e: any) {
           console.error("Google Connect Error:", e);
           alert(`Connection failed: ${e.message}`);
@@ -162,7 +151,7 @@ const SettingsView: React.FC<ExtendedSettingsViewProps> = ({ packages, config, o
             <TeamTab 
                 currentUser={currentUser || null} 
                 onUpdateProfile={onUpdateUserProfile || (() => {})} 
-                googleToken={googleToken || null} 
+                googleToken={isGoogleConnected ? 'CONNECTED' : null} 
                 onConnectGoogle={handleConnectGoogle} 
                 onDeleteAccount={onDeleteAccount || (() => {})} 
             />

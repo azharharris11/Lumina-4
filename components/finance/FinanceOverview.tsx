@@ -85,8 +85,19 @@ const FinanceOverview: React.FC<FinanceOverviewProps> = ({ accounts, transaction
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
                             <XAxis dataKey="date" stroke="#666" fontSize={12} tickFormatter={(str) => new Date(str).getDate().toString()} />
-                            <YAxis stroke="#666" fontSize={12} tickFormatter={(val) => `${val/1000000}m`} />
-                            <Tooltip contentStyle={{ backgroundColor: '#1c1917', border: '1px solid #333', color: '#fff' }} />
+                            <YAxis 
+                                stroke="#666" 
+                                fontSize={12} 
+                                tickFormatter={(val) => {
+                                    if (val >= 1000000) return `${(val/1000000).toFixed(1)}m`;
+                                    if (val >= 1000) return `${(val/1000).toFixed(0)}k`;
+                                    return val;
+                                }} 
+                            />
+                            <Tooltip 
+                                contentStyle={{ backgroundColor: '#1c1917', border: '1px solid #333', color: '#fff' }}
+                                formatter={(value: number) => [`Rp ${value.toLocaleString()}`, '']}
+                            />
                             <Area type="monotone" dataKey="income" stroke="#10b981" fillOpacity={1} fill="url(#colorIncome)" strokeWidth={2} />
                             <Area type="monotone" dataKey="expense" stroke="#f43f5e" fillOpacity={1} fill="url(#colorExpense)" strokeWidth={2} />
                         </AreaChart>

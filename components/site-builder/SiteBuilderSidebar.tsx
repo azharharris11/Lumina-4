@@ -118,7 +118,11 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = ({
         { type: 'TESTIMONIALS', label: 'Testimonials' },
         { type: 'FAQ', label: 'FAQ Accordion' },
         { type: 'CTA_BANNER', label: 'Call to Action' },
-        { type: 'MAP_LOCATION', label: 'Map Location' }
+        { type: 'MAP_LOCATION', label: 'Map Location' },
+        { type: 'CONTACT_FORM', label: 'Contact Form' },
+        { type: 'TEAM_GRID', label: 'Team Grid' },
+        { type: 'VIDEO_EMBED', label: 'Video Embed' },
+        { type: 'RICH_TEXT', label: 'Rich Text' }
     ];
 
     const isSaveDisabled = !hasChanges || isCheckingSubdomain || subdomainStatus === 'TAKEN' || subdomainStatus === 'ERROR';
@@ -372,29 +376,35 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = ({
                                 <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">INDEX</span>
                             </div>
                             
-                            {localSite.pages?.map(page => (
-                                <div 
-                                    key={page.id}
-                                    onClick={() => {
-                                        setActivePageId(page.id);
-                                        setActiveTab('CONTENT');
-                                    }}
-                                    className={`p-3 rounded border flex items-center justify-between cursor-pointer group ${activePageId === page.id ? 'bg-[#252525] border-blue-500 text-white' : 'border-[#333] text-gray-400 hover:bg-[#252525]'}`}
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-bold">{page.title}</span>
-                                        {page.hidden && <EyeOff size={12} className="text-gray-600"/>}
-                                    </div>
-                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={(e) => { e.stopPropagation(); handleHidePage(page.id, !page.hidden); }} className="p-1 hover:bg-[#333] rounded" title={page.hidden ? "Show" : "Hide"}>
-                                            {page.hidden ? <Eye size={12}/> : <EyeOff size={12}/>}
-                                        </button>
-                                        <button onClick={(e) => { e.stopPropagation(); handleDeletePage(page.id); }} className="p-1 hover:bg-rose-900/30 text-rose-500 rounded">
-                                            <Trash2 size={12}/>
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
+                            {localSite.pages && localSite.pages.length > 0 && (
+                                <Reorder.Group axis="y" values={localSite.pages} onReorder={(newOrder) => handleGlobalChange('pages', newOrder)} className="space-y-2">
+                                    {localSite.pages.map(page => (
+                                        <Reorder.Item key={page.id} value={page}>
+                                            <div 
+                                                onClick={() => {
+                                                    setActivePageId(page.id);
+                                                    setActiveTab('CONTENT');
+                                                }}
+                                                className={`p-3 rounded border flex items-center justify-between cursor-pointer group ${activePageId === page.id ? 'bg-[#252525] border-blue-500 text-white' : 'border-[#333] text-gray-400 hover:bg-[#252525]'}`}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <GripVertical size={14} className="text-gray-600 cursor-grab active:cursor-grabbing hover:text-white" onPointerDown={(e) => e.stopPropagation()} />
+                                                    <span className="text-sm font-bold">{page.title}</span>
+                                                    {page.hidden && <EyeOff size={12} className="text-gray-600"/>}
+                                                </div>
+                                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button onClick={(e) => { e.stopPropagation(); handleHidePage(page.id, !page.hidden); }} className="p-1 hover:bg-[#333] rounded" title={page.hidden ? "Show" : "Hide"}>
+                                                        {page.hidden ? <Eye size={12}/> : <EyeOff size={12}/>}
+                                                    </button>
+                                                    <button onClick={(e) => { e.stopPropagation(); handleDeletePage(page.id); }} className="p-1 hover:bg-rose-900/30 text-rose-500 rounded">
+                                                        <Trash2 size={12}/>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </Reorder.Item>
+                                    ))}
+                                </Reorder.Group>
+                            )}
                         </div>
                     </div>
                 )}
@@ -415,6 +425,76 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = ({
                                     {localSite.theme === theme.id && <div className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full shadow-sm"></div>}
                                 </button>
                             ))}
+                        </div>
+
+                        <div className="border-t border-[#333] pt-4 mt-4">
+                            <h3 className="text-xs font-bold text-gray-400 uppercase mb-2">Theme Colors</h3>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[10px] text-gray-500 uppercase block mb-1">Background</label>
+                                    <div className="flex items-center gap-2">
+                                        <input 
+                                            type="color" 
+                                            value={localSite.style?.backgroundColor || '#000000'}
+                                            onChange={e => handleGlobalChange('style', { ...localSite.style, backgroundColor: e.target.value })}
+                                            className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0"
+                                        />
+                                        <input 
+                                            value={localSite.style?.backgroundColor || '#000000'}
+                                            onChange={e => handleGlobalChange('style', { ...localSite.style, backgroundColor: e.target.value })}
+                                            className="flex-1 bg-[#252525] border border-[#333] rounded p-1.5 text-xs text-white uppercase"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-gray-500 uppercase block mb-1">Text Color</label>
+                                    <div className="flex items-center gap-2">
+                                        <input 
+                                            type="color" 
+                                            value={localSite.style?.textColor || '#ffffff'}
+                                            onChange={e => handleGlobalChange('style', { ...localSite.style, textColor: e.target.value })}
+                                            className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0"
+                                        />
+                                        <input 
+                                            value={localSite.style?.textColor || '#ffffff'}
+                                            onChange={e => handleGlobalChange('style', { ...localSite.style, textColor: e.target.value })}
+                                            className="flex-1 bg-[#252525] border border-[#333] rounded p-1.5 text-xs text-white uppercase"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-gray-500 uppercase block mb-1">Primary Accent</label>
+                                    <div className="flex items-center gap-2">
+                                        <input 
+                                            type="color" 
+                                            value={localSite.style?.primaryColor || '#3b82f6'}
+                                            onChange={e => handleGlobalChange('style', { ...localSite.style, primaryColor: e.target.value })}
+                                            className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0"
+                                        />
+                                        <input 
+                                            value={localSite.style?.primaryColor || '#3b82f6'}
+                                            onChange={e => handleGlobalChange('style', { ...localSite.style, primaryColor: e.target.value })}
+                                            className="flex-1 bg-[#252525] border border-[#333] rounded p-1.5 text-xs text-white uppercase"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-gray-500 uppercase block mb-1">Secondary Accent</label>
+                                    <div className="flex items-center gap-2">
+                                        <input 
+                                            type="color" 
+                                            value={localSite.style?.secondaryColor || '#ef4444'}
+                                            onChange={e => handleGlobalChange('style', { ...localSite.style, secondaryColor: e.target.value })}
+                                            className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0"
+                                        />
+                                        <input 
+                                            value={localSite.style?.secondaryColor || '#ef4444'}
+                                            onChange={e => handleGlobalChange('style', { ...localSite.style, secondaryColor: e.target.value })}
+                                            className="flex-1 bg-[#252525] border border-[#333] rounded p-1.5 text-xs text-white uppercase"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="border-t border-[#333] pt-4 mt-4">
@@ -453,6 +533,29 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = ({
                 {/* --- SETTINGS/MARKETING TAB --- */}
                 {activeTab === 'MARKETING' && (
                     <div className="space-y-4 animate-in fade-in duration-300">
+                        <div className="bg-[#252525] p-4 rounded border border-[#333]">
+                            <h3 className="text-xs font-bold text-gray-400 uppercase mb-3 flex items-center gap-2"><Palette size={12}/> Branding Assets</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-[10px] text-gray-500 uppercase block mb-1 font-bold">Favicon (32x32)</label>
+                                    <ImageUploader 
+                                        value={localSite.branding?.faviconUrl}
+                                        onChange={(url: string) => handleGlobalChange('branding', { ...localSite.branding, faviconUrl: url })}
+                                        className="w-full bg-[#1a1a1a] border border-[#333] rounded p-2 text-sm text-white outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-gray-500 uppercase block mb-1 font-bold">Social Share Image (1200x630)</label>
+                                    <ImageUploader 
+                                        value={localSite.branding?.socialShareImage}
+                                        onChange={(url: string) => handleGlobalChange('branding', { ...localSite.branding, socialShareImage: url })}
+                                        className="w-full bg-[#1a1a1a] border border-[#333] rounded p-2 text-sm text-white outline-none"
+                                    />
+                                    <p className="text-[10px] text-gray-500 mt-1">Displayed when sharing your site on social media.</p>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="bg-[#252525] p-4 rounded border border-[#333]">
                             <h3 className="text-xs font-bold text-gray-400 uppercase mb-3 flex items-center gap-2"><Globe size={12}/> Domain Configuration</h3>
                             

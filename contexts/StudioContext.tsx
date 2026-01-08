@@ -1,15 +1,15 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { 
-  StudioConfig, Booking, Asset, Client, Account, Package, Transaction, Notification, 
+import {
+  StudioConfig, Booking, Asset, Client, Account, Package, Transaction, Notification,
   OnboardingData, MonthlyMetric, BookingTask, ProjectStatus
 } from '../types';
 import { STUDIO_CONFIG } from '../data';
-import { db } from '../firebase';
-import { 
-  collection, doc, onSnapshot, query, where, limit, 
-  setDoc, updateDoc, writeBatch, getDoc, deleteDoc, runTransaction, getDocs 
+import { db, functions } from '../firebase';
+import {
+  collection, doc, onSnapshot, query, where, limit,
+  setDoc, updateDoc, writeBatch, getDoc, deleteDoc, runTransaction, getDocs
 } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { useAuth } from './AuthContext';
 
 interface StudioContextType {
@@ -23,29 +23,44 @@ interface StudioContextType {
   notifications: Notification[];
   metrics: MonthlyMetric[];
   loadingData: boolean;
-  users: any[]; 
-  
+  users: any[];
+
   // Actions
   updateConfig: (newConfig: StudioConfig) => Promise<void>;
   addBooking: (booking: Booking, paymentDetails?: { amount: number, accountId: string }) => Promise<void>;
   updateBooking: (booking: Booking) => Promise<void>;
   deleteBooking: (id: string) => Promise<void>;
+
   addClient: (client: Client) => Promise<void>;
   updateClient: (client: Client) => Promise<void>;
   deleteClient: (id: string) => Promise<void>;
+
   addAsset: (asset: Asset) => Promise<void>;
   updateAsset: (asset: Asset) => Promise<void>;
   deleteAsset: (id: string) => Promise<void>;
+
   addTransaction: (data: { description: string; amount: number; category: string; accountId: string; bookingId?: string, isRecurring?: boolean, receiptUrl?: string, submittedBy?: string, recipientId?: string }) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
   settleBooking: (bookingId: string, amount: number, accountId: string) => Promise<void>;
-  completeOnboarding: (data: OnboardingData) => Promise<void>;
   transferFunds: (fromId: string, toId: string, amount: number) => Promise<void>;
-  
-  // Automation
-  triggerAutomation: (status: ProjectStatus, bookingId?: string) => Promise<void>;
 
-  // Helpers
+  // Package Actions
+  addPackage: (pkg: Package) => Promise<void>;
+  updatePackage: (pkg: Package) => Promise<void>;
+  deletePackage: (id: string) => Promise<void>;
+
+  // User Actions (Team)
+  addUser: (user: any) => Promise<void>;
+  updateUser: (user: any) => Promise<void>;
+  deleteUser: (id: string) => Promise<void>;
+
+  // Account Actions
+  addAccount: (account: Account) => Promise<void>;
+  updateAccount: (account: Account) => Promise<void>;
+  deleteAccount: (id: string) => Promise<void>;
+
+  completeOnboarding: (data: OnboardingData) => Promise<void>;
+  triggerAutomation: (status: ProjectStatus, bookingId?: string) => Promise<void>;
   addNotification: (notif: Partial<Notification>) => void;
   dismissNotification: (id: string) => void;
 }
@@ -57,7 +72,7 @@ const RESERVED_SUBDOMAINS = ['www', 'app', 'admin', 'api', 'mail', 'support', 's
 
 export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser } = useAuth();
-  
+
   const [config, setConfig] = useState<StudioConfig>(STUDIO_CONFIG);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -67,7 +82,7 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [metrics, setMetrics] = useState<MonthlyMetric[]>([]);
-  const [users, setUsers] = useState<any[]>([]); 
+  const [users, setUsers] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
   // Notification Helper
@@ -78,9 +93,12 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         message: notif.message || '',
         time: new Date().toISOString(),
         read: false,
-        type: notif.type || 'INFO'
+        type: notif.type || 'INFO',
+        link: notif.link
     };
     setNotifications(prev => [newNotif, ...prev]);
+
+    // Auto dismiss after 5 seconds
     setTimeout(() => {
         setNotifications(prev => prev.filter(n => n.id !== newNotif.id));
     }, 5000);
@@ -97,58 +115,81 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return;
     }
 
-    const ownerId = currentUser.role === 'OWNER' ? currentUser.id : currentUser.id; 
-    
-    // Config
-    const configRef = doc(db, "studios", ownerId);
-    const unsubConfig = onSnapshot(configRef, (doc) => { if (doc.exists()) setConfig(doc.data() as StudioConfig); });
+    setLoadingData(true);
+    const ownerId = currentUser.id; // Or currentUser.ownerId if we had team logic fully
 
-    // Users
-    const qUsers = query(collection(db, "users"));
-    const unsubUsers = onSnapshot(qUsers, (snap) => setUsers(snap.docs.map(d => d.data())));
-
-    // Date Range for Bookings
-    const today = new Date();
-    const startRange = new Date(); startRange.setMonth(today.getMonth() - 6);
-    const endRange = new Date(); endRange.setMonth(today.getMonth() + 6);
-    const startStr = startRange.toISOString().split('T')[0];
-    const endStr = endRange.toISOString().split('T')[0];
-    
-    const qBookings = query(
-        collection(db, "bookings"), 
-        where("ownerId", "==", ownerId)
-    );
-    const unsubBookings = onSnapshot(qBookings, (snap) => {
-        const allBookings = snap.docs.map(d => d.data() as Booking);
-        setBookings(allBookings.filter(b => b.date >= startStr && b.date <= endStr));
+    // 1. Listen to Studio Config
+    const unsubConfig = onSnapshot(doc(db, "studios", ownerId), (doc) => {
+        if (doc.exists()) {
+            setConfig(doc.data() as StudioConfig);
+        }
     });
 
-    // Other Collections
-    const qClients = query(collection(db, "clients"), where("ownerId", "==", ownerId), limit(100));
-    const unsubClients = onSnapshot(qClients, (snap) => setClients(snap.docs.map(d => d.data() as Client)));
+    // 2. Listen to Collections
+    // Security Fix: Always filter by ownerId to ensure data isolation
+    
+    const qBookings = query(collection(db, "bookings"), where("ownerId", "==", ownerId));
+    const unsubBookings = onSnapshot(qBookings, (snapshot) => {
+        setBookings(snapshot.docs.map(d => d.data() as Booking));
+    }, (error) => {
+        console.error("Bookings Listen Error:", error);
+    });
 
     const qAssets = query(collection(db, "assets"), where("ownerId", "==", ownerId));
-    const unsubAssets = onSnapshot(qAssets, (snap) => setAssets(snap.docs.map(d => d.data() as Asset)));
+    const unsubAssets = onSnapshot(qAssets, (snapshot) => {
+        setAssets(snapshot.docs.map(d => d.data() as Asset));
+    }, (error) => {
+        console.error("Assets Listen Error:", error);
+    });
+
+    const qClients = query(collection(db, "clients"), where("ownerId", "==", ownerId));
+    const unsubClients = onSnapshot(qClients, (snapshot) => {
+        setClients(snapshot.docs.map(d => d.data() as Client));
+    }, (error) => {
+        console.error("Clients Listen Error:", error);
+    });
 
     const qAccounts = query(collection(db, "accounts"), where("ownerId", "==", ownerId));
-    const unsubAccounts = onSnapshot(qAccounts, (snap) => {
-        const accData = snap.docs.map(d => d.data() as Account);
-        if (accData.length > 0) setAccounts(accData);
+    const unsubAccounts = onSnapshot(qAccounts, (snapshot) => {
+        setAccounts(snapshot.docs.map(d => d.data() as Account));
+    }, (error) => {
+        console.error("Accounts Listen Error:", error);
     });
 
     const qPackages = query(collection(db, "packages"), where("ownerId", "==", ownerId));
-    const unsubPackages = onSnapshot(qPackages, (snap) => setPackages(snap.docs.map(d => d.data() as Package)));
+    const unsubPackages = onSnapshot(qPackages, (snapshot) => {
+        setPackages(snapshot.docs.map(d => d.data() as Package));
+    }, (error) => {
+        console.error("Packages Listen Error:", error);
+    });
 
-    const qTransactions = query(collection(db, "transactions"), where("ownerId", "==", ownerId), limit(200));
-    const unsubTransactions = onSnapshot(qTransactions, (snap) => setTransactions(snap.docs.map(d => d.data() as Transaction)));
+    const qTransactions = query(collection(db, "transactions"), where("ownerId", "==", ownerId));
+    const unsubTransactions = onSnapshot(qTransactions, (snapshot) => {
+        setTransactions(snapshot.docs.map(d => d.data() as Transaction));
+    }, (error) => {
+        console.error("Transactions Listen Error:", error);
+    });
+
+    // Users: Fetch self using doc() to comply with security rules
+    // Rule: match /users/{userId} allow read: if isOwner(userId)
+    const userDocRef = doc(db, "users", ownerId);
+    const unsubUsers = onSnapshot(userDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+            setUsers([docSnap.data()]);
+        } else {
+            setUsers([]);
+        }
+    }, (error) => {
+        console.error("Users Listen Error:", error);
+    });
 
     setLoadingData(false);
 
     return () => {
         unsubConfig();
         unsubBookings();
-        unsubClients();
         unsubAssets();
+        unsubClients();
         unsubAccounts();
         unsubPackages();
         unsubTransactions();
@@ -161,72 +202,31 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const updateConfig = async (newConfig: StudioConfig) => {
       if(!currentUser) return;
 
-      // VALIDASI SUBDOMAIN (CRITICAL LOGIC)
+      // Check if subdomain is being changed
       if (newConfig.site.subdomain && newConfig.site.subdomain !== config.site.subdomain) {
-          const sub = newConfig.site.subdomain.toLowerCase();
-          
-          // 1. Cek Reserved Keywords
-          if (RESERVED_SUBDOMAINS.includes(sub)) {
-              throw new Error(`Subdomain '${sub}' is not allowed (System Reserved).`);
-          }
-
-          // 2. Cek Duplikasi di Database
-          const q = query(
-              collection(db, "studios"), 
-              where("site.subdomain", "==", sub)
-          );
-          const snapshot = await getDocs(q);
-          
-          // Jika ada dokumen lain yang menggunakan subdomain ini
-          const isTaken = snapshot.docs.some(doc => doc.id !== currentUser.id);
-          
-          if (isTaken) {
-              throw new Error(`Subdomain '${sub}' is already taken. Please choose another.`);
+          try {
+              const claimFn = httpsCallable(functions, 'claimSubdomain');
+              await claimFn({ subdomain: newConfig.site.subdomain });
+              // Note: The function updates Firestore, but we update local state too for immediate UI feedback
+          } catch (e: any) {
+              console.error("Subdomain Claim Failed:", e);
+              // Extract nice message from Firebase Error
+              const msg = e.message || 'Failed to claim subdomain.';
+              throw new Error(msg);
           }
       }
 
-      await setDoc(doc(db, "studios", currentUser.id), newConfig);
+      // Update the rest of the config directly (allowed by security rules)
+      await setDoc(doc(db, "studios", currentUser.id), newConfig, { merge: true });
       setConfig(newConfig);
-  };
-
-  const checkConflictOnServer = async (newBooking: Booking) => {
-      if (!currentUser) return false;
-      const ownerId = currentUser.id;
-      
-      const q = query(
-          collection(db, "bookings"),
-          where("ownerId", "==", ownerId),
-          where("date", "==", newBooking.date)
-      );
-      
-      const snapshot = await getDocs(q);
-      const dayBookings = snapshot.docs.map(d => d.data() as Booking);
-      
-      const bufferMins = config.bufferMinutes || 0;
-      const [newStartH, newStartM] = newBooking.timeStart.split(':').map(Number);
-      const newStartMins = newStartH * 60 + newStartM;
-      const newEndMins = newStartMins + (newBooking.duration * 60) + bufferMins;
-
-      const roomConflict = dayBookings.find(b => {
-          if (b.status === 'CANCELLED' || b.studio !== newBooking.studio || b.id === newBooking.id) return false;
-          
-          const [bStartH, bStartM] = b.timeStart.split(':').map(Number);
-          const bStartMins = bStartH * 60 + bStartM;
-          const bEndMins = bStartMins + (b.duration * 60) + bufferMins;
-
-          return (newStartMins < bEndMins) && (newEndMins > bStartMins);
-      });
-
-      if (roomConflict) throw new Error(`Conflict detected! Room occupied by ${roomConflict.clientName}.`);
   };
 
   const addBooking = async (newBooking: Booking, paymentDetails?: { amount: number, accountId: string }) => {
       if (!currentUser) return;
-      const ownerId = currentUser.id;
-      
+
       const selectedPackage = packages.find(p => p.name === newBooking.package);
       let autoTasks: BookingTask[] = [];
-      
+
       if (selectedPackage && selectedPackage.defaultTasks) {
           autoTasks = selectedPackage.defaultTasks.map((title, idx) => ({
               id: `t-${Date.now()}-${idx}`,
@@ -235,76 +235,53 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }));
       }
 
-      const bookingWithAuth: Booking = { 
-          ...newBooking, 
-          ownerId: ownerId, 
-          paidAmount: paymentDetails?.amount || 0, 
-          photographerId: newBooking.photographerId || ownerId,
-          tasks: autoTasks.length > 0 ? autoTasks : newBooking.tasks 
+      // Prepare payload for Cloud Function
+      const bookingPayload = {
+          ...newBooking,
+          tasks: autoTasks.length > 0 ? autoTasks : newBooking.tasks
       };
 
       try {
-          await checkConflictOnServer(bookingWithAuth);
+          const createBookingFn = httpsCallable(functions, 'createBooking');
 
-          if (paymentDetails && paymentDetails.amount > 0) {
-              await runTransaction(db, async (transaction) => {
-                  const bookingRef = doc(db, "bookings", newBooking.id);
-                  const accountRef = doc(db, "accounts", paymentDetails.accountId);
-                  const transactionRef = doc(db, "transactions", `t-${Date.now()}`);
+          await createBookingFn({
+              booking: { ...bookingPayload, ownerId: currentUser.id },
+              paymentDetails: paymentDetails
+          });
 
-                  const accountDoc = await transaction.get(accountRef);
-                  if (!accountDoc.exists()) throw "Account does not exist!";
-
-                  const newBalance = (accountDoc.data().balance || 0) + paymentDetails.amount;
-
-                  transaction.set(bookingRef, bookingWithAuth);
-
-                  const newTransaction: Transaction = { 
-                      id: transactionRef.id, 
-                      date: new Date().toISOString(), 
-                      description: `Deposit - ${newBooking.clientName}`, 
-                      amount: Number(paymentDetails.amount), 
-                      type: 'INCOME', 
-                      accountId: paymentDetails.accountId, 
-                      category: 'Sales / Booking', 
-                      status: 'COMPLETED', 
-                      bookingId: newBooking.id, 
-                      ownerId: ownerId 
-                  };
-                  transaction.set(transactionRef, newTransaction);
-                  transaction.update(accountRef, { balance: newBalance });
-              });
-          } else {
-              await setDoc(doc(db, "bookings", newBooking.id), bookingWithAuth);
-          }
+          // Sync to Calendar is now handled by the backend function automatically if connected.
+          
           addNotification({ type: 'SUCCESS', title: 'Booking Created', message: `${newBooking.clientName} scheduled.` });
       } catch (e: any) {
           console.error("Add Booking Failed:", e);
-          throw e; 
+          const msg = e.message || 'Unknown error occurred';
+          addNotification({ type: 'ERROR', title: 'Booking Failed', message: msg });
+          throw e;
       }
   };
 
   const updateBooking = async (b: Booking) => {
+      if (!currentUser) return;
       const oldBooking = bookings.find(old => old.id === b.id);
-      let bookingToSave = { ...b };
+      let bookingToSave = { ...b, ownerId: currentUser.id }; // Force ownerId
 
       if (oldBooking && oldBooking.status !== b.status) {
           // Find matching automation rule from Settings
           const automation = config.workflowAutomations?.find(a => a.triggerStatus === b.status);
-          
+
           if (automation && automation.tasks && automation.tasks.length > 0) {
               const newTasks: BookingTask[] = automation.tasks.map((t, idx) => ({
                   id: `at-${Date.now()}-${idx}`,
                   title: t,
                   completed: false
               }));
-              
+
               bookingToSave.tasks = [...(bookingToSave.tasks || []), ...newTasks];
-              
-              addNotification({ 
-                  type: 'INFO', 
-                  title: 'Workflow Automation', 
-                  message: `Added ${newTasks.length} tasks for ${b.status} stage.` 
+
+              addNotification({
+                  type: 'INFO',
+                  title: 'Workflow Automation',
+                  message: `Added ${newTasks.length} tasks for ${b.status} stage.`
               });
           }
       }
@@ -312,46 +289,30 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       await setDoc(doc(db, "bookings", b.id), bookingToSave);
   };
 
-  // --- MANUAL TRIGGER FOR TESTING AUTOMATIONS ---
-  const triggerAutomation = async (status: ProjectStatus, bookingId?: string) => {
-      const automation = config.workflowAutomations?.find(a => a.triggerStatus === status);
-      
-      if (!automation) {
-          addNotification({ type: 'WARNING', title: 'No Automation Found', message: `No rules set for ${status}` });
-          return;
-      }
-
-      if (bookingId) {
-          // Apply to specific booking
-          const booking = bookings.find(b => b.id === bookingId);
-          if (booking) {
-              const newTasks: BookingTask[] = automation.tasks.map((t, idx) => ({
-                  id: `man-${Date.now()}-${idx}`,
-                  title: t,
-                  completed: false
-              }));
-              await updateBooking({ ...booking, tasks: [...(booking.tasks || []), ...newTasks] });
-              addNotification({ type: 'SUCCESS', title: 'Automation Applied', message: `Applied ${automation.tasks.length} tasks to ${booking.clientName}` });
-          }
-      } else {
-          // Just simulate the feedback for testing
-          addNotification({ type: 'SUCCESS', title: 'Test Successful', message: `Found ${automation.tasks.length} tasks configured for ${status}` });
-      }
-  };
+  // ... (manual trigger omitted for brevity, no changes needed there)
 
   const deleteBooking = async (id: string) => {
       try {
           const relatedTransactions = transactions.filter(t => t.bookingId === id);
           const batch = writeBatch(db);
-          
+
+          // 1. Reverse Financial Impact on Accounts
           relatedTransactions.forEach(t => {
+              const account = accounts.find(a => a.id === t.accountId);
+              if (account) {
+                  const accountRef = doc(db, "accounts", account.id);
+                  // If it was income, we subtract. If expense, we add back.
+                  const adjustment = t.type === 'INCOME' ? -t.amount : t.amount;
+                  batch.update(accountRef, { balance: account.balance + adjustment });
+              }
               batch.delete(doc(db, "transactions", t.id));
           });
-          
+
+          // 2. Delete the booking itself
           batch.delete(doc(db, "bookings", id));
           await batch.commit();
-          
-          addNotification({ type: 'SUCCESS', title: 'Deleted', message: 'Booking and related records removed.' });
+
+          addNotification({ type: 'SUCCESS', title: 'Deleted', message: 'Booking and related financial records removed.' });
       } catch (e) {
           console.error("Delete failed", e);
           addNotification({ type: 'ERROR', title: 'Error', message: 'Failed to delete booking.' });
@@ -364,11 +325,19 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const updateClient = async (client: Client) => {
-      await setDoc(doc(db, "clients", client.id), client);
+      if(!currentUser) return;
+      // Force ownerId to ensure it doesn't get lost on update
+      await setDoc(doc(db, "clients", client.id), { ...client, ownerId: currentUser.id });
   };
 
   const deleteClient = async (id: string) => {
-      await deleteDoc(doc(db, "clients", id));
+      try {
+          await deleteDoc(doc(db, "clients", id));
+          addNotification({ type: 'SUCCESS', title: 'Deleted', message: 'Client record removed.' });
+      } catch (e) {
+          console.error("Delete client failed", e);
+          addNotification({ type: 'ERROR', title: 'Error', message: 'Failed to delete client.' });
+      }
   };
 
   const addAsset = async (asset: Asset) => {
@@ -377,7 +346,9 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const updateAsset = async (asset: Asset) => {
-      await setDoc(doc(db, "assets", asset.id), asset);
+      if(!currentUser) return;
+      // Force ownerId
+      await setDoc(doc(db, "assets", asset.id), { ...asset, ownerId: currentUser.id });
   };
 
   const deleteAsset = async (id: string) => {
@@ -385,132 +356,192 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (asset && asset.status === 'IN_USE') {
           throw new Error(`Cannot delete '${asset.name}'. It is currently marked as IN USE.`);
       }
-      await deleteDoc(doc(db, "assets", id));
+      try {
+          await deleteDoc(doc(db, "assets", id));
+          addNotification({ type: 'SUCCESS', title: 'Deleted', message: 'Asset removed from inventory.' });
+      } catch (e) {
+          addNotification({ type: 'ERROR', title: 'Error', message: 'Failed to delete asset.' });
+      }
   };
 
   const addTransaction = async (data: { description: string; amount: number; category: string; accountId: string; bookingId?: string, isRecurring?: boolean, receiptUrl?: string, submittedBy?: string, recipientId?: string }) => {
       if(!currentUser) return;
-      
+
       try {
-          await runTransaction(db, async (transaction) => {
-              const tid = `t-${Date.now()}`;
-              const transactionRef = doc(db, "transactions", tid);
-              const accountRef = doc(db, "accounts", data.accountId);
-              
-              const accountDoc = await transaction.get(accountRef);
-              if (!accountDoc.exists()) throw "Account not found";
-
-              const newTransaction: Transaction = { 
-                  id: tid, 
-                  date: new Date().toISOString(), 
-                  description: data.description, 
-                  amount: data.amount, 
-                  type: 'EXPENSE', 
-                  accountId: data.accountId, 
-                  category: data.category, 
-                  status: 'COMPLETED', 
-                  bookingId: data.bookingId, 
-                  ownerId: currentUser.id,
-                  isRecurring: data.isRecurring,
-                  receiptUrl: data.receiptUrl,
-                  submittedBy: data.submittedBy,
-                  recipientId: data.recipientId
-              };
-
-              transaction.set(transactionRef, newTransaction);
-              transaction.update(accountRef, { balance: (accountDoc.data().balance || 0) - data.amount });
+          const processFn = httpsCallable(functions, 'processTransaction');
+          await processFn({
+              type: 'EXPENSE',
+              amount: data.amount,
+              accountId: data.accountId,
+              category: data.category,
+              description: data.description,
+              bookingId: data.bookingId,
+              date: new Date().toISOString(),
+              ownerId: currentUser.id
           });
+
           addNotification({ type: 'SUCCESS', title: 'Expense Recorded', message: `Rp ${data.amount.toLocaleString()} processed.` });
-      } catch (e) {
+      } catch (e: any) {
           console.error("Expense Transaction Failed", e);
-          addNotification({ type: 'ERROR', title: 'Error', message: 'Failed to record expense.' });
+          addNotification({ type: 'ERROR', title: 'Error', message: e.message || 'Failed to record expense.' });
       }
   };
 
   const deleteTransaction = async (id: string) => {
-      await deleteDoc(doc(db, "transactions", id));
+      const trans = transactions.find(t => t.id === id);
+      if (!trans) return;
+
+      try {
+          const batch = writeBatch(db);
+          
+          // 1. Reverse Account Balance
+          const account = accounts.find(a => a.id === trans.accountId);
+          if (account) {
+              const accountRef = doc(db, "accounts", account.id);
+              // INCOME -> Subtract, EXPENSE -> Add back
+              const adjustment = trans.type === 'INCOME' ? -trans.amount : trans.amount;
+              batch.update(accountRef, { balance: account.balance + adjustment });
+          }
+
+          // 2. Reverse Booking paidAmount if linked
+          if (trans.bookingId) {
+              const booking = bookings.find(b => b.id === trans.bookingId);
+              if (booking) {
+                  const bookingRef = doc(db, "bookings", booking.id);
+                  const currentPaid = booking.paidAmount || 0;
+                  batch.update(bookingRef, { paidAmount: Math.max(0, currentPaid - trans.amount) });
+              }
+          }
+
+          // 3. Delete the record
+          batch.delete(doc(db, "transactions", id));
+          await batch.commit();
+          
+          addNotification({ type: 'SUCCESS', title: 'Deleted', message: 'Transaction removed and balances reverted.' });
+      } catch (e) {
+          console.error("Delete transaction failed", e);
+          addNotification({ type: 'ERROR', title: 'Error', message: 'Failed to remove transaction.' });
+      }
   };
 
   const settleBooking = async (bookingId: string, amount: number, accountId: string) => {
       if (!currentUser) return;
 
       try {
-          await runTransaction(db, async (transaction) => {
-              const bookingRef = doc(db, "bookings", bookingId);
-              const accountRef = doc(db, "accounts", accountId);
-              const transactionRef = doc(db, "transactions", `t-${Date.now()}`);
+          const bookingRef = doc(db, "bookings", bookingId);
+          // 1. Update Booking Paid Amount (Allowed by Rules)
+          // We do this first because the Cloud Function only handles the money movement
+          const bookingSnap = await getDoc(bookingRef);
+          if (bookingSnap.exists()) {
+              const currentPaid = bookingSnap.data().paidAmount || 0;
+              await updateDoc(bookingRef, { paidAmount: currentPaid + amount });
+          }
 
-              const bookingDoc = await transaction.get(bookingRef);
-              const accountDoc = await transaction.get(accountRef);
-
-              if (!bookingDoc.exists()) throw "Booking not found";
-              if (!accountDoc.exists()) throw "Account not found";
-
-              const bookingData = bookingDoc.data() as Booking;
-              const accountData = accountDoc.data() as Account;
-
-              transaction.update(bookingRef, { paidAmount: (bookingData.paidAmount || 0) + amount });
-              transaction.update(accountRef, { balance: (accountData.balance || 0) + amount });
-
-              const newTrans: Transaction = { 
-                  id: transactionRef.id, 
-                  date: new Date().toISOString(), 
-                  description: amount > 0 ? `Payment - ${bookingData.clientName}` : `Refund - ${bookingData.clientName}`, 
-                  amount: Math.abs(amount), 
-                  type: amount > 0 ? 'INCOME' : 'EXPENSE', 
-                  accountId: accountId, 
-                  category: 'Sales / Booking', 
-                  status: 'COMPLETED', 
-                  bookingId: bookingId, 
-                  ownerId: currentUser.id 
-              };
-              transaction.set(transactionRef, newTrans);
+          // 2. Process Money Transaction (Secure Server-Side)
+          const processFn = httpsCallable(functions, 'processTransaction');
+          await processFn({
+              type: amount > 0 ? 'INCOME' : 'EXPENSE',
+              amount: Math.abs(amount),
+              accountId: accountId,
+              description: amount > 0 ? `Payment - Booking #${bookingId}` : `Refund - Booking #${bookingId}`,
+              category: 'Sales / Booking',
+              bookingId: bookingId,
+              date: new Date().toISOString(),
+              ownerId: currentUser.id
           });
-          
+
           addNotification({ type: 'SUCCESS', title: 'Payment Recorded', message: `Rp ${amount.toLocaleString()} processed.` });
-      } catch (e) {
+      } catch (e: any) {
           console.error("Settle Booking Transaction Failed:", e);
-          addNotification({ type: 'ERROR', title: 'Transaction Failed', message: 'Could not process payment. Please try again.' });
+          addNotification({ type: 'ERROR', title: 'Transaction Failed', message: e.message || 'Could not process payment.' });
       }
   };
 
   const transferFunds = async (fromId: string, toId: string, amount: number) => {
       if(!currentUser) return;
       try {
-          await runTransaction(db, async (transaction) => {
-              const fromRef = doc(db, "accounts", fromId);
-              const toRef = doc(db, "accounts", toId);
-              const transactionRef = doc(db, "transactions", `t-${Date.now()}`);
-
-              const fromDoc = await transaction.get(fromRef);
-              const toDoc = await transaction.get(toRef);
-
-              if (!fromDoc.exists() || !toDoc.exists()) throw "One or both accounts not found";
-
-              const fromData = fromDoc.data() as Account;
-              const toData = toDoc.data() as Account;
-
-              if (fromData.balance < amount) throw "Insufficient funds";
-
-              transaction.update(fromRef, { balance: fromData.balance - amount });
-              transaction.update(toRef, { balance: toData.balance + amount });
-
-              const newTrans: Transaction = { 
-                  id: transactionRef.id, 
-                  date: new Date().toISOString(), 
-                  description: `Transfer to ${toData.name}`, 
-                  amount: amount, 
-                  type: 'TRANSFER', 
-                  accountId: fromId, 
-                  category: 'Transfer', 
-                  status: 'COMPLETED', 
-                  ownerId: currentUser.id 
-              };
-              transaction.set(transactionRef, newTrans);
+          const processFn = httpsCallable(functions, 'processTransaction');
+          await processFn({
+              type: 'TRANSFER',
+              amount: amount,
+              accountId: fromId,
+              toAccountId: toId,
+              description: 'Internal Fund Transfer',
+              category: 'Transfer',
+              date: new Date().toISOString(),
+              ownerId: currentUser.id
           });
+
           addNotification({ type: 'SUCCESS', title: 'Transfer Complete', message: 'Funds moved successfully.' });
       } catch (e: any) {
-          addNotification({ type: 'ERROR', title: 'Transfer Failed', message: e.toString() });
+          addNotification({ type: 'ERROR', title: 'Transfer Failed', message: e.message || 'Transfer failed' });
+      }
+  };
+
+  // --- PACKAGE ACTIONS ---
+  const addPackage = async (pkg: Package) => {
+      if(!currentUser) return;
+      await setDoc(doc(db, "packages", pkg.id), { ...pkg, ownerId: currentUser.id });
+  };
+
+  const updatePackage = async (pkg: Package) => {
+      if(!currentUser) return;
+      await setDoc(doc(db, "packages", pkg.id), { ...pkg, ownerId: currentUser.id });
+  };
+
+  const deletePackage = async (id: string) => {
+      try {
+          await deleteDoc(doc(db, "packages", id));
+          addNotification({ type: 'SUCCESS', title: 'Deleted', message: 'Package removed.' });
+      } catch (e) {
+          addNotification({ type: 'ERROR', title: 'Error', message: 'Failed to delete package.' });
+      }
+  };
+
+  // --- USER ACTIONS (TEAM) ---
+  const addUser = async (user: any) => {
+      // NOTE: Creating a real login user requires Admin SDK. 
+      // This function creates a user profile document. 
+      // For security, strict rules should prevent creating users for other owners.
+      if(!currentUser) return;
+      // We inject ownerId to link this staff to the current studio owner if we implement team logic later
+      // For now, we just save the document. 
+      // If this is meant to be a team member, it should probably go into a subcollection or have a studioId.
+      // Assuming 'users' collection is global profiles.
+      await setDoc(doc(db, "users", user.id), user);
+  };
+
+  const updateUser = async (user: any) => {
+      if(!currentUser) return;
+      await setDoc(doc(db, "users", user.id), user);
+  };
+
+  const deleteUser = async (id: string) => {
+      try {
+          await deleteDoc(doc(db, "users", id));
+          addNotification({ type: 'SUCCESS', title: 'Deleted', message: 'Team member removed.' });
+      } catch (e) {
+          addNotification({ type: 'ERROR', title: 'Error', message: 'Failed to remove user.' });
+      }
+  };
+
+  // --- ACCOUNT ACTIONS ---
+  const addAccount = async (account: Account) => {
+      if(!currentUser) return;
+      await setDoc(doc(db, "accounts", account.id), { ...account, ownerId: currentUser.id });
+  };
+
+  const updateAccount = async (account: Account) => {
+      if(!currentUser) return;
+      await setDoc(doc(db, "accounts", account.id), { ...account, ownerId: currentUser.id }, { merge: true });
+  };
+
+  const deleteAccount = async (id: string) => {
+      try {
+          await deleteDoc(doc(db, "accounts", id));
+          addNotification({ type: 'SUCCESS', title: 'Deleted', message: 'Account removed.' });
+      } catch (e) {
+          addNotification({ type: 'ERROR', title: 'Error', message: 'Failed to delete account.' });
       }
   };
 
@@ -541,6 +572,53 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setConfig(newConfig);
   };
 
+  const triggerAutomation = async (status: ProjectStatus, bookingId?: string) => {
+        // Find automation for this status
+        const automation = config.workflowAutomations?.find(a => a.triggerStatus === status);
+
+        if (!automation) {
+            if (!bookingId) {
+                 addNotification({ type: 'INFO', title: 'No Automation', message: `No rules defined for ${status}.` });
+            }
+            return;
+        }
+
+        // Test Run Mode (No Booking ID)
+        if (!bookingId) {
+            addNotification({ 
+                type: 'SUCCESS', 
+                title: 'Automation Test', 
+                message: `Rule valid! Would add ${automation.tasks.length} tasks to booking.` 
+            });
+            return;
+        }
+
+        // Real Execution
+        const booking = bookings.find(b => b.id === bookingId);
+        if (!booking) return;
+
+        if (automation.tasks && automation.tasks.length > 0) {
+            const newTasks: BookingTask[] = automation.tasks.map((t, idx) => ({
+                id: `at-${Date.now()}-${idx}`,
+                title: t,
+                completed: false
+            }));
+
+            const updatedBooking = {
+                ...booking,
+                tasks: [...(booking.tasks || []), ...newTasks]
+            };
+
+            await updateBooking(updatedBooking);
+            
+            addNotification({
+                type: 'INFO',
+                title: 'Workflow Automation',
+                message: `Applied ${automation.triggerStatus} workflow.`
+            });
+        }
+  };
+
   return (
     <StudioContext.Provider value={{
         config, bookings, assets, clients, accounts, packages, transactions, notifications, metrics, loadingData, users,
@@ -548,8 +626,11 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         addClient, updateClient, deleteClient,
         addAsset, updateAsset, deleteAsset,
         addTransaction, deleteTransaction, settleBooking, transferFunds,
+        addPackage, updatePackage, deletePackage,
+        addUser, updateUser, deleteUser,
+        addAccount, updateAccount, deleteAccount,
         completeOnboarding,
-        triggerAutomation, 
+        triggerAutomation,
         addNotification, dismissNotification
     }}>
       {children}

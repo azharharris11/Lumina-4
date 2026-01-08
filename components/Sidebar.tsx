@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   LayoutDashboard, 
   CalendarDays, 
@@ -14,14 +14,21 @@ import {
   BarChart2,
   Grid,
   Sun,
-  Moon
+  Moon,
+  ChevronLeft,
+  Menu
 } from 'lucide-react';
-import { SidebarProps } from '../types'; // Updated import
+import { SidebarProps } from '../types'; 
 import { motion } from 'framer-motion';
 
 const Motion = motion as any;
 
-const Sidebar: React.FC<SidebarProps> = ({ currentUser, onNavigate, currentView, onLogout, onSwitchApp, isDarkMode, onToggleTheme, bookings }) => {
+const Sidebar: React.FC<SidebarProps> = ({ 
+  currentUser, onNavigate, currentView, onLogout, onSwitchApp, 
+  isDarkMode, onToggleTheme, bookings,
+  isCollapsed = false, onToggleCollapse
+}) => {
+
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['OWNER', 'ADMIN', 'PHOTOGRAPHER', 'EDITOR', 'FINANCE'] },
     { id: 'calendar', label: 'Schedule', icon: CalendarDays, roles: ['OWNER', 'ADMIN', 'PHOTOGRAPHER'] },
@@ -60,29 +67,41 @@ const Sidebar: React.FC<SidebarProps> = ({ currentUser, onNavigate, currentView,
   return (
     <Motion.aside 
       initial={{ x: -20, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      className="hidden lg:flex w-64 h-screen bg-lumina-surface border-r border-lumina-highlight flex-col justify-between fixed left-0 top-0 z-50 transition-all duration-300 shadow-xl"
+      animate={{ x: 0, opacity: 1, width: isCollapsed ? 80 : 256 }}
+      className={`hidden lg:flex h-screen bg-lumina-surface border-r border-lumina-highlight flex-col justify-between fixed left-0 top-0 z-50 transition-all duration-300 shadow-xl overflow-hidden`}
     >
       <div>
         {/* Header with App Switcher */}
-        <div className="h-24 flex items-center justify-between px-6 border-b border-lumina-highlight/50">
-          <div className="flex items-center">
+        <div className={`h-24 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between px-6'} border-b border-lumina-highlight/50 relative`}>
+          <div className="flex items-center overflow-hidden">
               <Aperture className="text-lumina-accent w-8 h-8 shrink-0" />
-              <span className="ml-3 font-display font-bold text-xl tracking-tight text-lumina-text">
-                LUMINA
-              </span>
+              {!isCollapsed && (
+                <span className="ml-3 font-display font-bold text-xl tracking-tight text-lumina-text whitespace-nowrap">
+                  LUMINA
+                </span>
+              )}
           </div>
-          {/* App Switcher Button */}
+          
+          {/* Collapse Toggle */}
           <button 
-            onClick={onSwitchApp}
-            title="Switch App"
-            className="flex p-2 rounded-lg text-lumina-muted hover:text-lumina-text hover:bg-lumina-highlight/50 transition-colors"
+            onClick={onToggleCollapse}
+            className="absolute -right-3 top-1/2 -translate-y-1/2 bg-lumina-highlight border border-lumina-accent/20 rounded-full p-1 text-lumina-accent shadow-lg hover:scale-110 transition-transform z-10"
           >
-              <Grid size={20} />
+            {isCollapsed ? <Menu size={14} /> : <ChevronLeft size={14} />}
           </button>
+
+          {!isCollapsed && (
+            <button 
+                onClick={onSwitchApp}
+                title="Switch App"
+                className="flex p-2 rounded-lg text-lumina-muted hover:text-lumina-text hover:bg-lumina-highlight/50 transition-colors"
+            >
+                <Grid size={20} />
+            </button>
+          )}
         </div>
 
-        <nav className="mt-8 px-4 space-y-2 max-h-[calc(100vh-200px)] overflow-y-auto custom-scrollbar">
+        <nav className="mt-8 px-3 space-y-2 max-h-[calc(100vh-250px)] overflow-y-auto no-scrollbar">
           {filteredMenu.map((item) => {
             const badgeCount = getBadgeCount(item.id);
             
@@ -90,21 +109,25 @@ const Sidebar: React.FC<SidebarProps> = ({ currentUser, onNavigate, currentView,
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
-              className={`w-full flex items-center justify-start px-4 py-3 rounded-xl transition-all duration-200 group relative
+              title={isCollapsed ? item.label : undefined}
+              className={`w-full flex items-center px-4 py-3 rounded-xl transition-all duration-200 group relative
                 ${currentView === item.id 
                   ? 'bg-lumina-highlight text-lumina-accent shadow-sm' 
                   : 'text-lumina-muted hover:text-lumina-text hover:bg-lumina-highlight/30'
-                }`}
+                }
+                ${isCollapsed ? 'justify-center px-0' : 'justify-start'}
+              `}
             >
-              <div className="relative">
+              <div className="relative shrink-0">
                   <item.icon className={`w-5 h-5 ${currentView === item.id ? 'stroke-[2.5px]' : 'stroke-2'}`} />
                   {badgeCount > 0 && (
-                      <span className="absolute -top-2 -right-2 min-w-[16px] h-4 flex items-center justify-center bg-red-500 text-white text-[9px] font-bold rounded-full px-1 border-2 border-lumina-surface">
+                      <span className={`absolute -top-2 -right-2 min-w-[16px] h-4 flex items-center justify-center bg-red-500 text-white text-[9px] font-bold rounded-full px-1 border-2 border-lumina-surface`}>
                           {badgeCount > 9 ? '9+' : badgeCount}
                       </span>
                   )}
               </div>
-              <span className="ml-3 font-medium tracking-wide text-sm">{item.label}</span>
+              {!isCollapsed && <span className="ml-3 font-medium tracking-wide text-sm whitespace-nowrap">{item.label}</span>}
+              
               {currentView === item.id && (
                 <Motion.div 
                   layoutId="activeIndicator"
@@ -116,39 +139,45 @@ const Sidebar: React.FC<SidebarProps> = ({ currentUser, onNavigate, currentView,
         </nav>
       </div>
 
-      <div className="p-4 border-t border-lumina-highlight/50 space-y-3 bg-lumina-base/30">
+      <div className={`p-4 border-t border-lumina-highlight/50 space-y-3 bg-lumina-base/30 ${isCollapsed ? 'items-center flex flex-col' : ''}`}>
         {/* Theme Toggle */}
         <button
           onClick={onToggleTheme}
-          className="w-full flex items-center justify-start p-2 rounded-xl bg-lumina-base border border-lumina-highlight hover:border-lumina-accent/50 transition-colors group"
+          className={`flex items-center rounded-xl bg-lumina-base border border-lumina-highlight hover:border-lumina-accent/50 transition-colors group ${isCollapsed ? 'p-2' : 'w-full p-2'}`}
+          title={isCollapsed ? (isDarkMode ? 'Light Mode' : 'Dark Mode') : undefined}
         >
            <div className={`p-1 rounded-lg ${isDarkMode ? 'text-yellow-400' : 'text-lumina-muted'}`}>
               {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
            </div>
-           <span className="ml-2 text-xs font-bold text-lumina-muted group-hover:text-lumina-text transition-colors">
-             {isDarkMode ? 'Light Mode' : 'Dark Mode'}
-           </span>
+           {!isCollapsed && (
+             <span className="ml-2 text-xs font-bold text-lumina-muted group-hover:text-lumina-text transition-colors">
+               {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+             </span>
+           )}
         </button>
 
         {/* Profile */}
-        <div className="flex items-center justify-start p-2 rounded-xl bg-lumina-base border border-lumina-highlight">
+        <div className={`flex items-center rounded-xl bg-lumina-base border border-lumina-highlight ${isCollapsed ? 'p-2' : 'p-2 w-full'}`}>
           <img 
             src={currentUser.avatar} 
             alt={currentUser.name} 
-            className="w-8 h-8 rounded-full border border-lumina-highlight"
+            className="w-8 h-8 rounded-full border border-lumina-highlight shrink-0"
           />
-          <div className="ml-3 overflow-hidden">
-            <p className="text-sm font-bold text-lumina-text truncate">{currentUser.name}</p>
-            <p className="text-xs text-lumina-muted font-mono uppercase tracking-wider">{currentUser.role}</p>
-          </div>
+          {!isCollapsed && (
+            <div className="ml-3 overflow-hidden">
+                <p className="text-sm font-bold text-lumina-text truncate">{currentUser.name}</p>
+                <p className="text-xs text-lumina-muted font-mono uppercase tracking-wider">{currentUser.role}</p>
+            </div>
+          )}
         </div>
         
         <button 
           onClick={onLogout}
-          className="w-full flex items-center justify-start p-2 text-lumina-muted hover:text-lumina-danger transition-colors"
+          title={isCollapsed ? 'Logout' : undefined}
+          className={`flex items-center text-lumina-muted hover:text-lumina-danger transition-colors ${isCollapsed ? 'p-2' : 'w-full p-2'}`}
         >
-          <LogOut className="w-4 h-4" />
-          <span className="ml-2 text-xs font-semibold uppercase tracking-widest">Logout</span>
+          <LogOut className="w-4 h-4 shrink-0" />
+          {!isCollapsed && <span className="ml-2 text-xs font-semibold uppercase tracking-widest">Logout</span>}
         </button>
       </div>
     </Motion.aside>

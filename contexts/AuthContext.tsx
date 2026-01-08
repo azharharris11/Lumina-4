@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '../types';
 import { auth, db, onAuthStateChanged, signOut as firebaseSignOut } from '../firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -18,17 +18,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    let unsubscribeSnapshot: (() => void) | null = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+        unsubscribeSnapshot = null;
+      }
+
       if (firebaseUser) {
-        try {
-          const userDocRef = doc(db, "users", firebaseUser.uid);
-          const userDocSnap = await getDoc(userDocRef);
-          
-          if (userDocSnap.exists()) {
-            const userData = userDocSnap.data() as User;
+        const userDocRef = doc(db, "users", firebaseUser.uid);
+        
+        unsubscribeSnapshot = onSnapshot(userDocRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const userData = docSnap.data() as User;
             setCurrentUser({ ...userData, id: firebaseUser.uid });
           } else {
-            // Fallback for new users registered via Auth but not yet in Firestore (rare)
+            // Fallback for new users registered via Auth but not yet in Firestore
             setCurrentUser({
               id: firebaseUser.uid,
               name: firebaseUser.displayName || 'User',
@@ -41,16 +47,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               hasCompletedOnboarding: false
             });
           }
-        } catch (error) {
-          console.error("Error fetching user profile:", error);
-        }
+          setLoading(false);
+        }, (error) => {
+          console.error("User snapshot error:", error);
+          setLoading(false);
+        });
       } else {
         setCurrentUser(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
+    };
   }, []);
 
   const logout = async () => {

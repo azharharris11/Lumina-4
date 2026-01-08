@@ -20,13 +20,16 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, booking, c
   const applicableTaxRate = booking.taxSnapshot !== undefined ? booking.taxSnapshot : (config.taxRate || 0);
 
   // Calculate Totals
-  const items = booking.items && booking.items.length > 0 ? booking.items : [
+  const hasItems = booking.items && booking.items.length > 0;
+  const items = hasItems ? booking.items : [
       {
           id: 'legacy',
-          description: `${booking.package} (${booking.duration} Hours)`,
+          description: `${booking.package} (${booking.duration} h)`,
           quantity: 1,
-          unitPrice: booking.price,
-          total: booking.price
+          // If no items, assume booking.price is the GROSS total
+          // Derive unit price by backing out tax
+          unitPrice: booking.price / (1 + applicableTaxRate/100),
+          total: booking.price / (1 + applicableTaxRate/100)
       }
   ];
   
@@ -220,27 +223,55 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, booking, c
                 </div>
 
                 <div className="border-t border-stone-200 pt-8 flex justify-between items-end print-border">
-                    <div>
-                        <h4 className="font-bold text-sm mb-2 print-black">Payment Methods</h4>
-                        <div className="text-sm text-stone-600 print-black">
-                            <p><span className="font-bold">Bank Name</span>: {config.bankName}</p>
-                            <p><span className="font-bold">Account</span>: {config.bankAccount}</p>
-                            <p><span className="font-bold">A/N</span>: {config.bankHolder}</p>
-                        </div>
+                    <div className="w-2/3">
+                        <h4 className="font-bold text-sm mb-3 print-black">Payment Methods</h4>
+                        
+                        {(config.paymentChannels && config.paymentChannels.length > 0) ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 print:grid-cols-2">
+                                {config.paymentChannels.map(channel => (
+                                    <div key={channel.id} className="text-sm text-stone-600 print-black mb-1">
+                                        <div className="flex items-center gap-2">
+                                            <p className="font-bold">{channel.name}</p>
+                                            <span className="text-[10px] bg-stone-100 px-1 rounded uppercase tracking-wide border border-stone-200 print-border">{channel.type}</span>
+                                        </div>
+                                        <p className="font-mono text-stone-800 font-bold">{channel.number}</p>
+                                        {channel.holder && <p className="text-xs italic text-stone-500">A/N {channel.holder}</p>}
+                                        
+                                        {channel.type === 'QRIS' && channel.qrUrl && (
+                                            <div className="mt-2">
+                                                <img src={channel.qrUrl} alt="QRIS" className="w-24 h-24 object-contain border border-stone-200" />
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-sm text-stone-600 print-black">
+                                <p><span className="font-bold">Bank Name</span>: {config.bankName}</p>
+                                <p><span className="font-bold">Account</span>: {config.bankAccount}</p>
+                                <p><span className="font-bold">A/N</span>: {config.bankHolder}</p>
+                            </div>
+                        )}
+
                         {config.invoiceFooter && (
-                            <p className="text-xs text-stone-400 mt-4 italic max-w-sm print-black">{config.invoiceFooter}</p>
+                            <p className="text-xs text-stone-400 mt-6 italic max-w-sm whitespace-pre-line print-black">{config.invoiceFooter}</p>
                         )}
                     </div>
                     <div className="text-right">
                         <p className="text-xs text-stone-400 print-black">Authorized Signature</p>
-                        <div className="h-16 flex items-end justify-end">
-                            <p className="font-display font-bold text-lg print-black">{config.name}</p>
+                        <div className="h-20 flex items-end justify-end">
+                            {config.signatureUrl ? (
+                                <img src={config.signatureUrl} className="h-16 object-contain mix-blend-multiply" alt="Signed"/>
+                            ) : (
+                                <p className="font-display font-bold text-lg print-black">{config.name}</p>
+                            )}
                         </div>
                     </div>
                 </div>
 
             </div>
-        </Motion.div>
+        </div>
+      </Motion.div>
     </div>
   );
 };

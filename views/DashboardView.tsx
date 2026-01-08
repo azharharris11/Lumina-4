@@ -41,20 +41,17 @@ const DashboardView: React.FC<DashboardProps> = ({ user, bookings, transactions 
   
   // REAL OCCUPANCY CALCULATION
   const OPERATING_HOURS = 13; // 09:00 - 22:00
-  const TOTAL_ROOMS = 3;
-  const TOTAL_CAPACITY_HOURS = OPERATING_HOURS * TOTAL_ROOMS;
+  const totalRooms = config?.rooms?.length || 3;
+  const TOTAL_CAPACITY_HOURS = OPERATING_HOURS * totalRooms;
   
   const hoursBookedToday = todayBookings.reduce((acc, b) => acc + b.duration, 0);
   const utilizationRate = Math.round((hoursBookedToday / TOTAL_CAPACITY_HOURS) * 100);
 
   // Smart Action Items Logic
-  const taxRate = config?.taxRate || 0;
-  
   const unpaidBookings = bookings.filter(b => {
-      if (b.status === 'CANCELLED') return false;
-      const totalDue = b.price * (1 + taxRate/100);
-      // Tolerance of 100 rupiah for float errors
-      return (totalDue - b.paidAmount) > 100;
+      if (b.status === 'CANCELLED' || b.status === 'COMPLETED') return false;
+      // b.price stores the total gross amount (including tax)
+      return (b.price - b.paidAmount) > 100;
   });
 
   const pendingEdits = bookings.filter(b => ['CULLING', 'EDITING'].includes(b.status));
@@ -94,6 +91,13 @@ const DashboardView: React.FC<DashboardProps> = ({ user, bookings, transactions 
       b.status === 'SHOOTING' && b.photographerId === user.id
   );
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 18) return 'Good Afternoon';
+    return 'Good Evening';
+  };
+
   return (
     <Motion.div 
       variants={containerVariants}
@@ -104,7 +108,7 @@ const DashboardView: React.FC<DashboardProps> = ({ user, bookings, transactions 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl lg:text-4xl font-display font-bold text-lumina-text mb-1 lg:mb-2">
-            Good Afternoon, <span className="text-lumina-accent">{(user.name || '').split(' ')[0]}</span>
+            {getGreeting()}, <span className="text-lumina-accent">{(user.name || '').split(' ')[0]}</span>
           </h1>
           <p className="text-lumina-muted text-sm lg:text-base">Schedule for <span className="text-lumina-text font-bold">{formattedDate}</span></p>
         </div>

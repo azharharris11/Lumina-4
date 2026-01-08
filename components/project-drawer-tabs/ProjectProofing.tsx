@@ -200,7 +200,7 @@ const ProjectProofing: React.FC<ProjectProofingProps> = ({ booking, googleToken,
                 <AlertTriangle size={32} className="text-rose-500 mx-auto mb-4"/>
                 <p className="text-sm text-white font-bold mb-2">Google Session Expired</p>
                 <p className="text-xs text-rose-300 mb-4">Access token is no longer valid. Please refresh your connection.</p>
-                <p className="text-[10px] text-lumina-muted">Go to Settings > Profile & Account to reconnect.</p>
+                <p className="text-[10px] text-lumina-muted">Go to Settings &gt; Profile & Account to reconnect.</p>
             </div>
         ) : !booking?.deliveryUrl ? (
             <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-lumina-highlight rounded-xl bg-lumina-base/20 min-h-[300px]">

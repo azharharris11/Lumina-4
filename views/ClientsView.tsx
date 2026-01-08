@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Client, Booking, ClientsViewProps } from '../types';
-import { Search, Plus, X } from 'lucide-react';
+import { Search, Plus, X, Users as UsersIcon, UserPlus } from 'lucide-react';
 import WhatsAppModal from '../components/WhatsAppModal';
 import { STUDIO_CONFIG } from '../data';
 import ClientListItem from '../components/clients/ClientListItem';
@@ -154,20 +154,41 @@ const ClientsView: React.FC<ClientsViewProps> = ({ clients, bookings, onUpdateCl
 
       <div className="flex-1 flex gap-6 overflow-hidden relative">
         <div className={`flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2 ${selectedClient ? 'hidden lg:block' : 'block'}`}>
-            {filteredClients.length === 0 && (
-                <div className="text-center py-10 text-lumina-muted opacity-50">No clients found.</div>
+            {clients.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center p-8 animate-in fade-in zoom-in duration-500">
+                    <div className="w-20 h-20 bg-lumina-surface border border-lumina-highlight rounded-3xl flex items-center justify-center mb-6 shadow-xl shadow-lumina-accent/5">
+                        <UsersIcon size={40} className="text-lumina-accent" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-white mb-2">No clients yet</h3>
+                    <p className="text-lumina-muted max-w-xs mx-auto mb-8">
+                        Start building your studio database by adding your first client today.
+                    </p>
+                    <button 
+                        onClick={() => setIsAddModalOpen(true)}
+                        className="flex items-center gap-2 px-6 py-3 bg-lumina-accent text-lumina-base rounded-xl font-bold hover:scale-105 transition-all shadow-lg shadow-lumina-accent/20"
+                    >
+                        <UserPlus size={18} /> Add Your First Client
+                    </button>
+                </div>
+            ) : filteredClients.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 text-center">
+                    <Search size={40} className="text-lumina-muted mb-4 opacity-20" />
+                    <p className="text-lumina-muted font-bold">No results found</p>
+                    <p className="text-xs text-lumina-muted/50">Try searching for a different name or phone number.</p>
+                </div>
+            ) : (
+                filteredClients.map((client, i) => (
+                    <ClientListItem 
+                        key={client.id}
+                        client={client}
+                        index={i}
+                        isSelected={selectedClient?.id === client.id}
+                        spend={getClientSpend(client.id)}
+                        getCategoryColor={getCategoryColor}
+                        onSelect={(c) => { setSelectedClient(c); setIsEditing(false); }}
+                    />
+                ))
             )}
-            {filteredClients.map((client, i) => (
-                <ClientListItem 
-                    key={client.id}
-                    client={client}
-                    index={i}
-                    isSelected={selectedClient?.id === client.id}
-                    spend={getClientSpend(client.id)}
-                    getCategoryColor={getCategoryColor}
-                    onSelect={(c) => { setSelectedClient(c); setIsEditing(false); }}
-                />
-            ))}
         </div>
 
         <div className={`lg:w-[400px] bg-lumina-surface border border-lumina-highlight rounded-2xl overflow-hidden flex flex-col absolute inset-0 lg:static z-10 ${selectedClient ? 'flex' : 'hidden lg:flex'}`}>

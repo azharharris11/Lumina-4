@@ -63,6 +63,9 @@ const App: React.FC = () => {
       addClient, updateClient, deleteClient,
       addAsset, updateAsset, deleteAsset,
       addTransaction, deleteTransaction, settleBooking, transferFunds,
+      addPackage, updatePackage, deletePackage,
+      addUser, updateUser, deleteUser,
+      addAccount, updateAccount, deleteAccount,
       completeOnboarding,
       dismissNotification 
   } = useStudio();
@@ -81,8 +84,11 @@ const App: React.FC = () => {
   
   // Initialize Google Token (Persistent Mode)
   const [googleToken, setGoogleToken] = useState<string | null>(() => {
-      return localStorage.getItem('lumina_g_token');
+      // Check both local and session storage
+      return sessionStorage.getItem('lumina_g_token') || localStorage.getItem('lumina_g_token');
   });
+  
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   
   // Public Site Logic
   const [portalBooking, setPortalBooking] = useState<Booking | null>(null);
@@ -124,8 +130,8 @@ const App: React.FC = () => {
       ];
 
       // Check if current hostname is one of the main app domains
-      // We check if it *exactly* matches one of the main domains or ends with .run.app (Cloud Run)
-      const isMainApp = MAIN_DOMAINS.some(domain => hostname === domain) || hostname.endsWith('.run.app');
+      // We check if it *exactly* matches one of the main domains, ends with .run.app (Cloud Run), or is a GitHub Codespace
+      const isMainApp = MAIN_DOMAINS.some(domain => hostname === domain) || hostname.endsWith('.run.app') || hostname.endsWith('.app.github.dev');
 
       const handlePublicAccess = async (identifier: string, method: 'ID' | 'SUBDOMAIN' | 'CUSTOM_DOMAIN') => {
           setViewMode('PUBLIC');
@@ -248,7 +254,7 @@ const App: React.FC = () => {
           case 'production': return <ProductionView bookings={bookings} onSelectBooking={(id) => { setSelectedBookingId(id); setIsProjectDrawerOpen(true); }} currentUser={currentUser} onUpdateBooking={updateBooking} config={config} />;
           case 'inventory': return <InventoryView assets={assets} users={usersList} onAddAsset={addAsset} onUpdateAsset={updateAsset} onDeleteAsset={deleteAsset} config={config} />;
           case 'clients': return <ClientsView clients={clients} bookings={bookings} onAddClient={addClient} onUpdateClient={updateClient} onDeleteClient={deleteClient} onSelectBooking={(id) => { setSelectedBookingId(id); setIsProjectDrawerOpen(true); }} config={config} />;
-          case 'team': return <TeamView users={usersList} bookings={bookings} onAddUser={async (u) => { await setDoc(doc(db, "users", u.id), u); }} onUpdateUser={async (u) => { await setDoc(doc(db, "users", u.id), u); }} onDeleteUser={async (id) => { await deleteDoc(doc(db, "users", id)); }} onRecordExpense={addTransaction} />;
+          case 'team': return <TeamView users={usersList} bookings={bookings} onAddUser={addUser} onUpdateUser={updateUser} onDeleteUser={deleteUser} onRecordExpense={addTransaction} />;
           case 'finance': return <FinanceView 
               accounts={accounts} 
               metrics={metrics} 
@@ -260,17 +266,11 @@ const App: React.FC = () => {
               onSettleBooking={settleBooking} 
               onDeleteTransaction={deleteTransaction} 
               config={config} 
-              onAddAccount={async (a) => { 
-                  // Fix: Inject ownerId to satisfy Firestore rules
-                  await setDoc(doc(db, "accounts", a.id), { ...a, ownerId: currentUser.id }); 
-              }} 
-              onUpdateAccount={async (a) => { 
-                  // Fix: Ensure ownerId persists on update
-                  await setDoc(doc(db, "accounts", a.id), { ...a, ownerId: currentUser.id }, { merge: true }); 
-              }} 
+              onAddAccount={addAccount} 
+              onUpdateAccount={updateAccount} 
           />;
           case 'analytics': return <AnalyticsView bookings={bookings} packages={packages} transactions={transactions} users={users} />;
-          case 'settings': return <SettingsView packages={packages} config={config} onAddPackage={async (p) => { await setDoc(doc(db, "packages", p.id), { ...p, ownerId: currentUser.id }); }} onUpdatePackage={async (p) => { await setDoc(doc(db, "packages", p.id), p); }} onDeletePackage={async (id) => { await deleteDoc(doc(db, "packages", id)); }} onUpdateConfig={updateConfig} currentUser={currentUser} onUpdateUserProfile={async (u) => { await setDoc(doc(db, "users", u.id), u); setCurrentUser(u); }} onDeleteAccount={async () => { }} googleToken={googleToken} setGoogleToken={handleSetGoogleToken} assets={assets} />;
+          case 'settings': return <SettingsView packages={packages} config={config} onAddPackage={addPackage} onUpdatePackage={updatePackage} onDeletePackage={deletePackage} onUpdateConfig={updateConfig} currentUser={currentUser} onUpdateUserProfile={async (u) => { await updateUser(u); setCurrentUser(u); }} onDeleteAccount={async () => { }} googleToken={googleToken} setGoogleToken={handleSetGoogleToken} assets={assets} />;
           default: return <DashboardView user={currentUser} bookings={bookings} transactions={transactions} onSelectBooking={(id) => { setSelectedBookingId(id); setIsProjectDrawerOpen(true); }} selectedDate={new Date().toISOString().split('T')[0]} onNavigate={setCurrentView} config={config} />;
       }
   };
@@ -278,10 +278,21 @@ const App: React.FC = () => {
   return (
     <div className="flex h-screen bg-lumina-base text-white font-sans overflow-hidden">
       <GlobalNotifications notifications={notifications} onDismiss={dismissNotification} />
-      <Sidebar currentUser={currentUser} onNavigate={setCurrentView} currentView={currentView} onLogout={logout} onSwitchApp={() => setViewMode('LAUNCHER')} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(!isDarkMode)} bookings={bookings} />
+      <Sidebar 
+        currentUser={currentUser} 
+        onNavigate={setCurrentView} 
+        currentView={currentView} 
+        onLogout={logout} 
+        onSwitchApp={() => setViewMode('LAUNCHER')} 
+        isDarkMode={isDarkMode} 
+        onToggleTheme={() => setIsDarkMode(!isDarkMode)} 
+        bookings={bookings}
+        // These props need to be added to SidebarProps type if not there
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+      />
       
-      {/* ADDED lg:ml-64 to accommodate the fixed sidebar */}
-      <main className="flex-1 flex flex-col h-screen relative overflow-hidden lg:ml-64">
+      <main className={`flex-1 flex flex-col h-screen relative overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
           <div className="flex-1 overflow-y-auto p-4 lg:p-8 pb-24 lg:pb-8 custom-scrollbar relative z-0" id="main-content">
               <AnimatePresence mode="wait">
                   <Motion.div key={currentView} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }} className="h-full">

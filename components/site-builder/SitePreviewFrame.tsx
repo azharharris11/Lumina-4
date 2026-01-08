@@ -28,7 +28,39 @@ const SitePreviewFrame: React.FC<SitePreviewFrameProps> = ({ children, className
         doc.body.style.opacity = '0';
         doc.body.style.transition = 'opacity 0.3s ease';
 
-        // 2. Inject Tailwind CDN
+        // 2. Inject Tailwind Config (Must be before CDN)
+        const tailwindConfigScript = doc.createElement('script');
+        tailwindConfigScript.innerHTML = `
+          tailwind = {
+            config: {
+              darkMode: 'class',
+              theme: {
+                extend: {
+                  colors: {
+                    lumina: {
+                      base: 'rgb(var(--base) / <alpha-value>)',
+                      surface: 'rgb(var(--surface) / <alpha-value>)',
+                      highlight: 'rgb(var(--highlight) / <alpha-value>)',
+                      accent: 'rgb(var(--accent) / <alpha-value>)',
+                      muted: 'rgb(var(--muted) / <alpha-value>)',
+                      danger: 'rgb(var(--danger) / <alpha-value>)',
+                      text: 'rgb(var(--text-main) / <alpha-value>)',
+                    },
+                    'real-white': '#ffffff',
+                  },
+                  fontFamily: {
+                    sans: ['Outfit', 'sans-serif'],
+                    display: ['Syne', 'sans-serif'],
+                    serif: ['Playfair Display', 'serif'],
+                  }
+                }
+              }
+            }
+          }
+        `;
+        doc.head.appendChild(tailwindConfigScript);
+
+        // 3. Inject Tailwind CDN
         const tailwindScript = doc.createElement('script');
         tailwindScript.id = 'site-preview-tailwind';
         tailwindScript.src = "https://cdn.tailwindcss.com";
@@ -41,7 +73,7 @@ const SitePreviewFrame: React.FC<SitePreviewFrameProps> = ({ children, className
         };
         doc.head.appendChild(tailwindScript);
 
-        // 3. Inject Google Fonts
+        // 4. Inject Google Fonts
         const fontPreconnect1 = doc.createElement('link');
         fontPreconnect1.rel = 'preconnect';
         fontPreconnect1.href = 'https://fonts.googleapis.com';
@@ -101,7 +133,13 @@ const SitePreviewFrame: React.FC<SitePreviewFrameProps> = ({ children, className
       ref={setContentRef}
       className={className}
       title="Site Preview"
-      style={{ border: 'none', width: '100%', height: '100%' }}
+      style={{ 
+          border: 'none', 
+          width: '100%', 
+          height: '100%',
+          opacity: isLoaded ? 1 : 0,
+          transition: 'opacity 0.5s ease'
+      }}
     >
       {mountNode && createPortal(children, mountNode)}
     </iframe>

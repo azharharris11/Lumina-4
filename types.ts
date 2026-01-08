@@ -7,7 +7,7 @@ export type AccountType = 'BANK' | 'CASH' | 'E_WALLET';
 export type AssetStatus = 'AVAILABLE' | 'IN_USE' | 'MAINTENANCE' | 'BROKEN';
 export type AssetCategory = 'CAMERA' | 'LENS' | 'LIGHTING' | 'PROP' | 'BACKGROUND' | 'AUDIO' | 'CABLES' | string;
 export type SiteTheme = 'NOIR' | 'ETHEREAL' | 'VOGUE' | 'MINIMAL' | 'CINEMA' | 'RETRO' | 'ATELIER' | 'HORIZON' | 'BOLD' | 'IMPACT' | 'CLEANSLATE' | 'AUTHORITY';
-export type SectionType = 'HERO' | 'TEXT_IMAGE' | 'GALLERY' | 'FEATURES' | 'PRICING' | 'TESTIMONIALS' | 'FAQ' | 'CTA_BANNER' | 'MAP_LOCATION';
+export type SectionType = 'HERO' | 'TEXT_IMAGE' | 'GALLERY' | 'FEATURES' | 'PRICING' | 'TESTIMONIALS' | 'FAQ' | 'CTA_BANNER' | 'MAP_LOCATION' | 'CONTACT_FORM' | 'TEAM_GRID' | 'VIDEO_EMBED' | 'RICH_TEXT';
 
 export interface User {
   id: string;
@@ -24,6 +24,7 @@ export interface User {
   hasCompletedOnboarding?: boolean;
   studioFocus?: string;
   studioName?: string;
+  isGoogleConnected?: boolean;
 }
 
 export interface Account {
@@ -179,6 +180,7 @@ export interface Booking {
   costSnapshot?: PackageCostItem[];
   proofingData?: ProofingItem[];
   selectionSubmitted?: boolean; // New Flag
+  googleSync?: boolean; // Added for calendar sync preference
   ownerId?: string;
 }
 
@@ -290,8 +292,9 @@ export interface SiteSection {
         buttonLink?: string;
         bookingMode?: 'INSTANT' | 'INQUIRY'; 
         mapConfig?: { lat: number; lng: number; zoom: number; label: string }; 
-        items?: { title: string; text: string; icon?: string }[];
+        items?: { title: string; text: string; icon?: string; image?: string }[];
         layout?: 'LEFT' | 'RIGHT' | 'CENTER';
+        html?: string;
     };
 }
 
@@ -397,6 +400,15 @@ export interface OnboardingData {
   initialPackage: { name: string; price: number; duration: number };
 }
 
+export interface PaymentChannel {
+    id: string;
+    type: 'BANK' | 'E_WALLET' | 'QRIS';
+    name: string; // BCA, Mandiri, GoPay
+    number: string; // 1234567890
+    holder: string; // PT Lumina
+    qrUrl?: string; // Optional for QRIS
+}
+
 export interface StudioConfig {
   name: string;
   address: string;
@@ -404,9 +416,15 @@ export interface StudioConfig {
   website: string;
   
   taxRate: number;
-  bankName: string;
-  bankAccount: string;
-  bankHolder: string;
+  bankName: string; // Deprecated: Use paymentChannels
+  bankAccount: string; // Deprecated
+  bankHolder: string; // Deprecated
+  paymentChannels?: PaymentChannel[]; // New: Multi-channel support
+
+  portalAccentColor?: string; // e.g. #D4AF37
+  portalBackgroundColor?: string; // e.g. #000000 or #FFFFFF
+  portalBackgroundUrl?: string; // URL for bg image
+
   invoicePrefix?: string;
   requiredDownPaymentPercentage?: number;
   paymentDueDays?: number;
@@ -420,8 +438,10 @@ export interface StudioConfig {
   workflowAutomations?: WorkflowAutomation[];
 
   logoUrl?: string;
+  signatureUrl?: string;
   npwp?: string;
   invoiceFooter?: string;
+  contractTerms?: string; // New: Custom Contract Terms
   rooms: StudioRoom[];
   templates: WhatsAppTemplates;
   
@@ -443,6 +463,8 @@ export interface SidebarProps {
   isDarkMode?: boolean;
   onToggleTheme?: () => void;
   bookings?: Booking[];
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export interface DashboardProps {

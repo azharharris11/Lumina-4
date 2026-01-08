@@ -1,10 +1,10 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { SiteConfig, Package, User, SiteGalleryItem, SiteTestimonial, SiteFAQ, StudioConfig, PublicBookingSubmission, SitePage, SiteSection } from '../../../types';
-import ScrollReveal from '../ScrollReveal';
-import BeforeAfterSlider from '../BeforeAfterSlider';
-import BookingWidget from '../BookingWidget';
+import { SiteConfig, Package, User, SiteGalleryItem, SiteTestimonial, SiteFAQ, StudioConfig, PublicBookingSubmission, SitePage, SiteSection } from '../../types';
+import ScrollReveal from './ScrollReveal';
+import BeforeAfterSlider from './BeforeAfterSlider';
+import BookingWidget from './BookingWidget';
 
 const Motion = motion as any;
 

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { AlertCircle, Clock, ArrowRight, MessageCircle } from 'lucide-react';
+import { AlertCircle, Clock, ArrowRight, MessageCircle, CheckCircle2 } from 'lucide-react';
 import { Booking } from '../../types';
 
 const Motion = motion as any;
@@ -58,8 +58,12 @@ const DashboardActionItems: React.FC<DashboardActionItemsProps> = ({ actionItems
                </Motion.div>
            ))}
            {actionItems.length === 0 && (
-               <div className="p-8 text-center text-lumina-muted border border-dashed border-lumina-highlight rounded-xl">
-                   <p className="text-sm">All caught up! No pending actions.</p>
+               <div className="p-8 text-center border border-dashed border-lumina-highlight rounded-xl bg-lumina-surface/30">
+                   <div className="w-12 h-12 rounded-full bg-lumina-highlight/50 flex items-center justify-center mx-auto mb-3">
+                        <CheckCircle2 className="text-lumina-accent" size={24} />
+                   </div>
+                   <p className="font-bold text-lumina-text text-sm mb-1">All Caught Up!</p>
+                   <p className="text-xs text-lumina-muted">No pending actions requiring your attention.</p>
                </div>
            )}
         </div>

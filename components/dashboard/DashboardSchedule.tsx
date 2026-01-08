@@ -28,7 +28,7 @@ const DashboardSchedule: React.FC<DashboardScheduleProps> = ({ bookings, selecte
             </button>
           </div>
 
-          <div className="space-y-3 lg:space-y-4">
+          <div className="space-y-3 lg:space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
             {bookings.length === 0 ? (
               <p className="text-lumina-muted py-8 text-center italic text-sm">No sessions scheduled for this date.</p>
             ) : (

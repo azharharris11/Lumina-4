@@ -3,6 +3,14 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { SiteConfig, Package, User, SiteGalleryItem, SiteTestimonial, SiteFAQ, StudioConfig, PublicBookingSubmission, SitePage, SiteSection } from '../../../types';
 import BookingWidget from '../BookingWidget';
+import HeroBlock from '../blocks/HeroBlock';
+import FeaturesBlock from '../blocks/FeaturesBlock';
+import PricingBlock from '../blocks/PricingBlock';
+import ContactBlock from '../blocks/ContactBlock';
+import TeamBlock from '../blocks/TeamBlock';
+import VideoBlock from '../blocks/VideoBlock';
+import RichTextBlock from '../blocks/RichTextBlock';
+import ServicesBlock from '../blocks/ServicesBlock';
 
 const Motion = motion as any;
 
@@ -20,74 +28,100 @@ const MinimalTheme: React.FC<ThemeProps> = ({ site, activePage, packages, users,
     const data = activePage || site;
     const sections = (data as SitePage).sections || [];
 
+    const scrollToBooking = () => {
+        const w = document.getElementById('booking-widget');
+        if(w) w.scrollIntoView({behavior:'smooth'});
+    };
+
     const renderHero = (headline: string, desc: string, img: string) => (
-        <header className="px-4 md:px-6 py-12 md:py-32 max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-24">
-            <div className="flex flex-col justify-between order-2 md:order-1">
-                <Motion.h1 
-                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
-                    className="text-3xl md:text-6xl font-medium leading-tight mb-4 md:mb-8 break-words"
-                >
-                    {headline}
-                </Motion.h1>
-                <div className="space-y-6">
-                    <p className="text-gray-500 text-sm md:text-base max-w-md leading-relaxed">{desc}</p>
-                    <button onClick={() => {
-                        const w = document.getElementById('booking-widget');
-                        if(w) w.scrollIntoView({behavior:'smooth'});
-                    }} className="text-xs font-bold border-b border-black pb-1 hover:opacity-50 transition-opacity w-fit">DISCOVER MORE</button>
-                </div>
-            </div>
-            <Motion.div 
-                initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2, duration: 0.8 }}
-                className="aspect-[4/5] overflow-hidden bg-gray-100 order-1 md:order-2"
-            >
-                <img src={img} className="w-full h-full object-cover" />
-            </Motion.div>
-        </header>
+        <HeroBlock 
+            headline={headline}
+            description={desc}
+            image={img}
+            layout="LEFT"
+            onButtonClick={scrollToBooking}
+            buttonClassName="border-black text-black"
+        />
     );
 
     const renderSections = () => sections.map((section: SiteSection) => {
         switch(section.type) {
             case 'HERO': return <div key={section.id}>{renderHero(section.content.headline || '', section.content.description || '', section.content.image || '')}</div>;
             case 'TEXT_IMAGE': return (
-                <section key={section.id} className="py-20 px-6 max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
-                    <div className={`bg-gray-50 aspect-[4/5] ${section.content.layout === 'RIGHT' ? 'md:order-2' : 'md:order-1'}`}>
-                        <img src={section.content.image} className="w-full h-full object-cover" />
-                    </div>
-                    <div className={`${section.content.layout === 'RIGHT' ? 'md:order-1' : 'md:order-2'}`}>
-                        <h2 className="text-2xl font-medium mb-6">{section.content.headline}</h2>
-                        <p className="text-gray-500 leading-relaxed text-sm">{section.content.description}</p>
-                    </div>
-                </section>
+                <FeaturesBlock 
+                    key={section.id}
+                    headline={section.content.headline}
+                    description={section.content.description}
+                    image={section.content.image}
+                    imagePosition={section.content.layout === 'RIGHT' ? 'RIGHT' : 'LEFT'}
+                />
             );
             case 'PRICING': return (
-                <div key={section.id} className="px-4 md:px-6 py-12 md:py-20 bg-gray-50">
-                    <div className="max-w-4xl mx-auto">
-                        <h2 className="text-sm font-bold mb-8 md:mb-12 uppercase tracking-wider text-gray-400">{section.content.headline || 'Services'}</h2>
-                        <div className="space-y-6 md:space-y-8">
-                            {packages.filter((p: any) => p.active).map((pkg: any) => (
-                                <div key={pkg.id} className="flex flex-col md:flex-row justify-between md:items-baseline border-b border-gray-200 pb-4 gap-2 md:gap-0">
-                                    <h3 className="text-lg md:text-xl font-medium w-full md:w-1/3">{pkg.name}</h3>
-                                    <p className="text-xs md:text-sm text-gray-500 w-full md:w-1/3">{pkg.features.slice(0, 3).join(', ')}</p>
-                                    <span className="text-base md:text-lg w-full md:w-1/3 text-left md:text-right font-mono">Rp {pkg.price.toLocaleString()}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
+                <PricingBlock 
+                    key={section.id}
+                    headline={section.content.headline}
+                    packages={packages}
+                />
+            );
+            case 'CONTACT_FORM': return (
+                <ContactBlock 
+                    key={section.id}
+                    headline={section.content.headline}
+                    description={section.content.description}
+                    titleClassName="font-medium tracking-tight text-3xl"
+                    buttonClassName="border-b border-black text-black bg-transparent hover:opacity-50 !p-0 !pb-1 !rounded-none uppercase text-xs"
+                />
+            );
+            case 'TEAM_GRID': 
+                const members = (section.content.items && section.content.items.length > 0) 
+                    ? section.content.items.map((item, idx) => ({ id: `manual-${idx}`, name: item.title, role: item.text, image: item.image || '' }))
+                    : users.filter(u => u.status === 'ACTIVE').map(u => ({ id: u.id, name: u.name, role: u.role, image: u.avatar }));
+                
+                return (
+                    <TeamBlock 
+                        key={section.id}
+                        headline={section.content.headline}
+                        description={section.content.description}
+                        members={members}
+                        titleClassName="font-medium tracking-tight text-3xl"
+                    />
+                );
+            case 'VIDEO_EMBED': return (
+                <VideoBlock 
+                    key={section.id}
+                    headline={section.content.headline}
+                    description={section.content.description}
+                    videoUrl={section.content.videoUrl || ''}
+                    titleClassName="font-medium tracking-tight text-3xl"
+                />
+            );
+            case 'RICH_TEXT': return (
+                <RichTextBlock 
+                    key={section.id}
+                    html={section.content.html || ''}
+                    className="prose-headings:font-medium prose-headings:tracking-tight"
+                />
+            );
+            case 'FEATURES': return (
+                 <ServicesBlock 
+                    key={section.id}
+                    headline={section.content.headline}
+                    items={section.content.items || []}
+                    titleClassName="font-medium tracking-tight text-3xl"
+                />
             );
             default: return null;
         }
     });
 
     return (
-        <div className="bg-white text-[#1a1a1a] font-sans min-h-full tracking-tight overflow-x-hidden">
-            <nav className="px-4 md:px-6 py-6 flex justify-between items-start sticky top-0 bg-white/90 backdrop-blur-sm z-50 border-b border-gray-100">
+        <div className="bg-[var(--site-bg)] text-[var(--site-text)] font-sans min-h-full tracking-tight overflow-x-hidden transition-colors duration-300">
+            <nav className="px-4 md:px-6 py-6 flex justify-between items-start sticky top-0 bg-[var(--site-bg)]/90 backdrop-blur-sm z-50 border-b border-[var(--site-text)]/5">
                 <span className="font-bold text-sm tracking-tighter truncate max-w-[150px] cursor-pointer" onClick={() => onNavigate && onNavigate('HOME')}>{site.title}</span>
-                <div className="hidden md:flex gap-6 text-xs font-medium text-gray-500">
-                    <span onClick={() => onNavigate && onNavigate('HOME')} className="cursor-pointer hover:text-black">Home</span>
+                <div className="hidden md:flex gap-6 text-xs font-medium opacity-50">
+                    <span onClick={() => onNavigate && onNavigate('HOME')} className="cursor-pointer hover:opacity-100 transition-opacity">Home</span>
                     {site.pages?.map(p => (
-                        <span key={p.id} onClick={() => onNavigate && onNavigate(p.id)} className="cursor-pointer hover:text-black">{p.title}</span>
+                        <span key={p.id} onClick={() => onNavigate && onNavigate(p.id)} className="cursor-pointer hover:opacity-100 transition-opacity">{p.title}</span>
                     ))}
                 </div>
             </nav>

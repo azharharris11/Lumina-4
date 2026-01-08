@@ -4,6 +4,11 @@ import { motion } from 'framer-motion';
 import { SiteConfig, Package, User, SiteGalleryItem, SiteTestimonial, SiteFAQ, StudioConfig, PublicBookingSubmission, SitePage, SiteSection, Booking } from '../../../types';
 import BeforeAfterSlider from '../BeforeAfterSlider';
 import BookingWidget from '../BookingWidget';
+import ContactBlock from '../blocks/ContactBlock';
+import TeamBlock from '../blocks/TeamBlock';
+import VideoBlock from '../blocks/VideoBlock';
+import RichTextBlock from '../blocks/RichTextBlock';
+import GalleryBlock from '../blocks/GalleryBlock';
 
 const Motion = motion as any;
 
@@ -136,25 +141,69 @@ const BoldTheme: React.FC<ThemeProps> = ({ site, activePage, packages, users, co
                 case 'CTA_BANNER': return <div key={section.id}>{renderCTA(section.content.headline || 'Ready?', section.content.buttonText || 'Inquire')}</div>;
                 case 'GALLERY': return <div key={section.id}>{renderPortfolio()}</div>;
                 case 'PRICING': return <div key={section.id}>{renderPricing(section.content.headline)}</div>;
+                case 'CONTACT_FORM': return (
+                    <ContactBlock 
+                        key={section.id}
+                        headline={section.content.headline}
+                        description={section.content.description}
+                        className="bg-white border-b-4 border-black"
+                        titleClassName="text-5xl md:text-7xl font-black uppercase"
+                        inputClassName="bg-white border-4 border-black p-4 font-bold shadow-[4px_4px_0_0_black] placeholder-gray-500 text-black"
+                        buttonClassName="bg-black text-white border-4 border-black hover:bg-[#bef264] hover:text-black font-black uppercase shadow-[6px_6px_0_0_#bef264] hover:shadow-none hover:translate-x-[6px] hover:translate-y-[6px]"
+                    />
+                );
+                case 'TEAM_GRID': 
+                    const members = (section.content.items && section.content.items.length > 0) 
+                        ? section.content.items.map((item, idx) => ({ id: `manual-${idx}`, name: item.title, role: item.text, image: item.image || '' }))
+                        : users.filter(u => u.status === 'ACTIVE').map(u => ({ id: u.id, name: u.name, role: u.role, image: u.avatar }));
+                    
+                    return (
+                        <TeamBlock 
+                            key={section.id}
+                            headline={section.content.headline}
+                            description={section.content.description}
+                            members={members}
+                            className="bg-[#bef264] border-b-4 border-black"
+                            titleClassName="text-5xl md:text-7xl font-black uppercase"
+                            cardClassName="bg-white border-4 border-black p-6 shadow-[8px_8px_0_0_black]"
+                        />
+                    );
+                case 'VIDEO_EMBED': return (
+                    <VideoBlock 
+                        key={section.id}
+                        headline={section.content.headline}
+                        description={section.content.description}
+                        videoUrl={section.content.videoUrl || ''}
+                        className="bg-black text-white border-b-4 border-black"
+                        titleClassName="text-[#bef264] font-black uppercase text-4xl"
+                    />
+                );
+                case 'RICH_TEXT': return (
+                    <RichTextBlock 
+                        key={section.id}
+                        html={section.content.html || ''}
+                        className="border-b-4 border-black bg-white prose-headings:font-black prose-headings:uppercase"
+                    />
+                );
                 default: return null;
             }
         });
     };
 
     return (
-        <div className="bg-white text-black font-sans min-h-full border-[8px] md:border-[16px] border-black overflow-x-hidden selection:bg-[#bef264] selection:text-black">
-            <nav className="p-4 md:p-6 flex justify-between items-center border-b-4 border-black sticky top-0 bg-white z-50">
+        <div className="bg-[var(--site-bg)] text-[var(--site-text)] font-sans min-h-full border-[8px] md:border-[16px] border-[var(--site-text)] overflow-x-hidden selection:bg-[var(--site-primary)] selection:text-[var(--site-bg)] transition-colors duration-300">
+            <nav className="p-4 md:p-6 flex justify-between items-center border-b-4 border-[var(--site-text)] sticky top-0 bg-[var(--site-bg)] z-50">
                 <div className="flex items-center gap-4 md:gap-8">
                     <span 
                         onClick={() => onNavigate && onNavigate('HOME')}
-                        className="text-lg md:text-2xl font-black tracking-tighter uppercase italic hover:text-[#bef264] transition-colors cursor-pointer truncate max-w-[150px]"
+                        className="text-lg md:text-2xl font-black tracking-tighter uppercase italic hover:text-[var(--site-primary)] transition-colors cursor-pointer truncate max-w-[150px]"
                     >
                         {site.title}
                     </span>
                     <div className="hidden md:flex gap-4 text-xs font-black uppercase">
-                        <button onClick={() => onNavigate && onNavigate('HOME')} className="hover:underline decoration-2 decoration-[#bef264]">Home</button>
+                        <button onClick={() => onNavigate && onNavigate('HOME')} className="hover:underline decoration-2 decoration-[var(--site-primary)]">Home</button>
                         {site.pages?.map(page => (
-                            <button key={page.id} onClick={() => onNavigate && onNavigate(page.id)} className="hover:underline decoration-2 decoration-[#bef264]">{page.title}</button>
+                            <button key={page.id} onClick={() => onNavigate && onNavigate(page.id)} className="hover:underline decoration-2 decoration-[var(--site-primary)]">{page.title}</button>
                         ))}
                     </div>
                 </div>
@@ -163,7 +212,7 @@ const BoldTheme: React.FC<ThemeProps> = ({ site, activePage, packages, users, co
                         const widget = document.getElementById('booking-widget');
                         if(widget) widget.scrollIntoView({ behavior: 'smooth' });
                     }}
-                    className="bg-black text-white px-4 py-1.5 md:px-6 md:py-2 text-xs md:text-base font-bold uppercase hover:bg-[#bef264] hover:text-black transition-colors border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] md:shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+                    className="bg-[var(--site-text)] text-[var(--site-bg)] px-4 py-1.5 md:px-6 md:py-2 text-xs md:text-base font-bold uppercase hover:bg-[var(--site-primary)] hover:text-[var(--site-bg)] transition-colors border-2 border-[var(--site-text)] shadow-[2px_2px_0_0_rgba(0,0,0,1)] md:shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
                 >
                     Book Now
                 </button>

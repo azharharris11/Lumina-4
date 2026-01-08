@@ -38,28 +38,35 @@ const ProductionKanbanCard: React.FC<ProductionKanbanCardProps> = ({ booking, cu
                 draggable
                 onDragStart={(e: any) => onDragStart(e, booking.id)}
                 onClick={() => onSelect(booking.id)}
-                className="w-full text-left bg-lumina-base border border-lumina-highlight p-3 rounded-xl shadow-sm hover:border-lumina-accent/50 cursor-grab active:cursor-grabbing group relative overflow-hidden transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-lumina-accent"
+                className="w-full text-left bg-lumina-base border border-lumina-highlight p-2.5 md:p-3 rounded-xl shadow-sm hover:border-lumina-accent/50 cursor-grab active:cursor-grabbing group relative overflow-hidden transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-lumina-accent active:scale-[0.98]"
             >
+                {/* Visual Accent */}
+                <div className={`absolute left-0 top-0 bottom-0 w-1 ${getDeadlineColor(booking.date).split(' ')[0].replace('text-', 'bg-')}`} />
+
                 {/* Card Content */}
-                <div className="flex justify-between items-start mb-1.5">
-                    <span className="text-[9px] font-bold text-lumina-muted uppercase tracking-wider truncate max-w-[100px]">{booking.package}</span>
-                    {booking.photographerId === currentUser?.id && (
-                        <div className="px-1.5 py-0.5 bg-indigo-500/20 text-indigo-300 rounded text-[8px] font-bold">YOU</div>
-                    )}
+                <div className="flex justify-between items-start mb-1 pl-1">
+                    <span className="text-[8px] md:text-[9px] font-bold text-lumina-muted uppercase tracking-widest truncate max-w-[120px]">{booking.package}</span>
+                    <div className="flex gap-1">
+                        {booking.photographerId === currentUser?.id && (
+                            <div className="px-1 py-0.5 bg-indigo-500/20 text-indigo-300 rounded text-[7px] font-black">MY JOB</div>
+                        )}
+                    </div>
                 </div>
                 
-                <h4 className="font-bold text-white text-sm mb-1 truncate">{booking.clientName}</h4>
+                <h4 className="font-bold text-white text-sm mb-1 truncate pl-1">{booking.clientName}</h4>
                 
-                <div className="flex items-center gap-2 text-[10px] text-lumina-muted mb-2">
-                    <Clock size={10} />
-                    <span>{new Date(booking.date).toLocaleDateString()}</span>
+                <div className="flex items-center gap-1.5 text-[9px] md:text-[10px] text-lumina-muted mb-2 pl-1">
+                    <Clock size={10} className="shrink-0" />
+                    <span>{new Date(booking.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
                 </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-lumina-highlight/50">
-                    <div className={`text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${getDeadlineColor(booking.date)}`}>
-                        <AlertCircle size={10} /> Due Soon
+                <div className="flex items-center justify-between pt-1.5 border-t border-lumina-highlight/30 ml-1">
+                    <div className={`text-[8px] md:text-[9px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1 ${getDeadlineColor(booking.date)}`}>
+                        <AlertCircle size={10} /> 
+                        <span className="hidden sm:inline">Due:</span> 
+                        {new Date(booking.date).toLocaleDateString()}
                     </div>
-                    <div className="w-5 h-5 rounded-full bg-lumina-surface border border-lumina-highlight flex items-center justify-center text-[9px] text-white font-bold">
+                    <div className="w-5 h-5 rounded-full bg-lumina-surface border border-lumina-highlight flex items-center justify-center text-[8px] text-white font-bold shadow-inner">
                         {booking.clientName.charAt(0)}
                     </div>
                 </div>

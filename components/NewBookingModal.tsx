@@ -20,16 +20,18 @@ interface NewBookingModalProps {
   onAddBooking?: (booking: Booking, paymentDetails?: { amount: number, accountId: string }) => Promise<void>;
   onAddClient?: (client: Client) => void; 
   initialData?: { date: string, time: string, studio: string };
-  googleToken?: string | null;
+  // googleToken prop removed
   packages?: Package[];
 }
 
-const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, photographers, accounts, bookings = [], clients = [], config, onAddBooking, onAddClient, initialData, packages = [], googleToken, assets = [] }) => {
+const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, photographers, accounts, bookings = [], clients = [], config, onAddBooking, onAddClient, initialData, packages = [], assets = [] }) => {
   const [step, setStep] = useState(1);
   const [clientSearch, setClientSearch] = useState('');
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isCreatingClient, setIsCreatingClient] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [createdBooking, setCreatedBooking] = useState<Booking | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   
   const DRAFT_KEY = 'lumina_booking_draft';
@@ -60,11 +62,13 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
       photographerId: photographers[0]?.id || '',
       price: 0,
       notes: '',
-      syncGoogle: !!googleToken
+      syncGoogle: true // Default to true, backend handles actual sync check
   });
 
-  const [newClientForm, setNewClientForm] = useState({ name: '', phone: '', email: '', category: 'NEW' });
+  const [newClientForm, setNewClientForm] = useState({ name: '', phone: '', email: '', instagram: '', category: 'NEW' });
   const [paymentForm, setPaymentForm] = useState({ amount: 0, accountId: '' });
+  const [discountForm, setDiscountForm] = useState<{ type: 'FIXED' | 'PERCENT', value: number }>({ type: 'FIXED', value: 0 });
+  const [showDiscountInput, setShowDiscountInput] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -72,7 +76,7 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
         if (savedDraft && !initialData) {
             try {
                 const parsed = JSON.parse(savedDraft);
-                setBookingForm(prev => ({...prev, ...parsed.form, syncGoogle: !!googleToken}));
+                setBookingForm(prev => ({...prev, ...parsed.form}));
                 if (parsed.client) setSelectedClient(parsed.client);
                 setStep(parsed.step || 1);
             } catch (e) { console.error("Draft parse error", e); }
@@ -90,8 +94,10 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
         
         setIsSubmitting(false);
         setSubmitError(null);
+        setDiscountForm({ type: 'FIXED', value: 0 });
+        setShowDiscountInput(false);
     }
-  }, [isOpen, initialData, googleToken]);
+  }, [isOpen, initialData]);
 
   useEffect(() => {
       if (isOpen) {
@@ -103,6 +109,8 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
           localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
       }
   }, [bookingForm, selectedClient, step, isOpen]);
+// ... (rest of the file remains unchanged until render part)
+
 
   useEffect(() => {
       if (accounts.length > 0 && !paymentForm.accountId) {
@@ -110,7 +118,17 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
       }
   }, [accounts]);
 
-  const filteredClients = clients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()) || c.phone.includes(clientSearch));
+  const filteredClients = useMemo(() => {
+      let result = clients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()) || c.phone.includes(clientSearch));
+      
+      // Optimistic UI: Ensure selectedClient is in the list even if not in 'clients' prop yet
+      if (selectedClient && !result.find(c => c.id === selectedClient.id)) {
+          // Only add if it matches search (or if search is empty), OR force it to top if it's the active selection
+          result = [selectedClient, ...result];
+      }
+      return result;
+  }, [clients, clientSearch, selectedClient]);
+
   const availablePackages = config.site?.showPricing ? (packages.length > 0 ? packages : PACKAGES) : (packages.length > 0 ? packages : PACKAGES);
 
   // --- ROBUST CONFLICT DETECTION (Client Side Preview) ---
@@ -125,16 +143,24 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
       // End time includes duration AND buffer to ensure cleaning/prep time
       const newEndMins = newStartMins + (bookingForm.duration * 60) + bufferMins; 
 
+      // 0. CHECK OPERATING HOURS
+      const opStartH = parseInt(config.operatingHoursStart || '09:00');
+      const opEndH = parseInt(config.operatingHoursEnd || '21:00');
+      const opStartMins = opStartH * 60;
+      const opEndMins = opEndH * 60;
+
+      if (newStartMins < opStartMins || newEndMins > opEndMins) {
+          return `Outside operating hours (${config.operatingHoursStart} - ${config.operatingHoursEnd})`;
+      }
+
       // 1. CHECK ROOM CONFLICTS
       const roomConflict = bookings.find(b => {
           if (b.status === 'CANCELLED' || b.date !== bookingForm.date || b.studio !== bookingForm.studio) return false;
 
           const [bStartH, bStartM] = b.timeStart.split(':').map(Number);
           const bStartMins = bStartH * 60 + bStartM;
-          // Existing booking also claims its buffer time
           const bEndMins = bStartMins + (b.duration * 60) + bufferMins;
 
-          // Overlap logic: (StartA < EndB) and (EndA > StartB)
           return (newStartMins < bEndMins) && (newEndMins > bStartMins);
       });
 
@@ -144,7 +170,30 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
           )} (incl. ${bufferMins}m buffer)`;
       }
 
-      // 2. CHECK ASSET CONFLICTS (Equipment Double Booking)
+      // 2. CHECK PHOTOGRAPHER CONFLICTS
+      const photographerConflict = bookings.find(b => {
+          if (b.status === 'CANCELLED' || b.date !== bookingForm.date || b.photographerId !== bookingForm.photographerId) return false;
+
+          const [bStartH, bStartM] = b.timeStart.split(':').map(Number);
+          const bStartMins = bStartH * 60 + bStartM;
+          const bEndMins = bStartMins + (b.duration * 60) + bufferMins;
+
+          return (newStartMins < bEndMins) && (newEndMins > bStartMins);
+      });
+
+      if (photographerConflict) {
+          const photographer = photographers.find(p => p.id === bookingForm.photographerId);
+          return `${photographer?.name || 'Photographer'} is already assigned to ${photographerConflict.clientName} at this time.`;
+      }
+
+      // 3. CHECK PHOTOGRAPHER LEAVE / UNAVAILABLE DATES
+      const selectedPhotographer = photographers.find(p => p.id === bookingForm.photographerId);
+      if (selectedPhotographer?.unavailableDates?.includes(bookingForm.date)) {
+          return `${selectedPhotographer.name} is marked as unavailable on this date.`;
+      }
+
+      // 4. CHECK ASSET CONFLICTS (Equipment Double Booking)
+      // Check logic: If selected package requires assets, check if those assets are used by ANY other booking at the same time
       const selectedPkg = availablePackages.find(p => p.id === bookingForm.packageId);
       const requiredAssetIds = selectedPkg?.defaultAssetIds || [];
 
@@ -159,6 +208,9 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
           });
 
           for (const booking of concurrentBookings) {
+              // We need to know what assets the *other* booking is using.
+              // Since 'items' might not link to assets directly in this simple data model,
+              // we look at the package they booked.
               const bPkg = packages.find(p => p.name === booking.package);
               
               if (bPkg && bPkg.defaultAssetIds) {
@@ -197,6 +249,7 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
               name: newClientForm.name,
               phone: newClientForm.phone,
               email: newClientForm.email,
+              instagram: newClientForm.instagram,
               category: newClientForm.category,
               notes: '',
               joinedDate: getLocalDateString(), // Timezone fix
@@ -206,6 +259,8 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
           setSelectedClient(newClient);
           setIsCreatingClient(false);
           setClientSearch('');
+          // Auto-advance to next step for smoother flow
+          setStep(2);
       }
   };
 
@@ -222,8 +277,28 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
   };
 
   const calculateTotal = () => {
+      let subtotal = bookingForm.price;
+      
+      // Apply Discount
+      let discountAmount = 0;
+      if (discountForm.value > 0) {
+          if (discountForm.type === 'PERCENT') {
+              discountAmount = subtotal * (discountForm.value / 100);
+          } else {
+              discountAmount = discountForm.value;
+          }
+      }
+      
+      const taxableAmount = Math.max(0, subtotal - discountAmount);
       const tax = config.taxRate || 0;
-      return bookingForm.price * (1 + tax/100);
+      const taxAmount = taxableAmount * (tax / 100);
+      
+      return {
+          subtotal,
+          discountAmount,
+          taxAmount,
+          total: taxableAmount + taxAmount
+      };
   };
 
   const isStepValid = () => {
@@ -242,6 +317,7 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
           setIsSubmitting(true);
           setSubmitError(null);
 
+          const { total, discountAmount } = calculateTotal();
           const selectedPkg = availablePackages.find(p => p.id === bookingForm.packageId) || { name: 'Custom', features: [] };
           
           const newBooking: Booking = {
@@ -253,7 +329,7 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
               timeStart: bookingForm.timeStart,
               duration: bookingForm.duration,
               package: selectedPkg.name,
-              price: bookingForm.price,
+              price: total, // Store final total as price for now, ideally strictly separation
               paidAmount: 0,
               status: 'BOOKED',
               photographerId: bookingForm.photographerId,
@@ -272,14 +348,20 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
               ],
               taxSnapshot: config.taxRate,
               notes: bookingForm.notes,
-              logs: []
+              googleSync: bookingForm.syncGoogle,
+              logs: [],
+              discount: discountAmount > 0 ? { 
+                  type: discountForm.type, 
+                  value: discountForm.value 
+              } : undefined
           };
 
           try {
               // This is now an async operation that checks for conflicts on server
               await onAddBooking(newBooking, paymentForm.amount > 0 ? paymentForm : undefined);
+              setCreatedBooking(newBooking);
+              setIsSuccess(true);
               localStorage.removeItem(DRAFT_KEY);
-              onClose();
           } catch (e: any) {
               console.error("Submission failed:", e);
               setSubmitError(e.message || "Failed to create booking. Please try again.");
@@ -290,6 +372,45 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
   };
 
   if (!isOpen) return null;
+
+  if (isSuccess && createdBooking) {
+      return (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+              <div className="absolute inset-0 bg-black/80 backdrop-blur-sm"></div>
+              <Motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="relative bg-lumina-surface border border-lumina-highlight w-full max-w-md p-8 rounded-3xl shadow-2xl text-center"
+              >
+                  <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <CheckCircle2 className="text-emerald-500" size={40} />
+                  </div>
+                  <h2 className="text-2xl font-bold text-white mb-2">Booking Confirmed!</h2>
+                  <p className="text-lumina-muted mb-8 text-sm">Session for <span className="text-white font-bold">{createdBooking.clientName}</span> has been successfully scheduled.</p>
+                  
+                  <div className="space-y-3">
+                      <button 
+                        onClick={() => {
+                            const text = `Hi ${createdBooking.clientName}, your booking for ${createdBooking.package} on ${createdBooking.date} at ${createdBooking.timeStart} is confirmed!`;
+                            window.open(`https://wa.me/${createdBooking.clientPhone.replace(/\D/g,'')}?text=${encodeURIComponent(text)}`, '_blank');
+                        }}
+                        className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors"
+                      >
+                          <Camera size={18} /> Send Confirmation (WA)
+                      </button>
+                      <button 
+                        onClick={onClose}
+                        className="w-full py-3 bg-lumina-highlight hover:bg-lumina-highlight/80 text-white font-bold rounded-xl transition-colors"
+                      >
+                          Done
+                      </button>
+                  </div>
+              </Motion.div>
+          </div>
+      );
+  }
+
+  const totals = calculateTotal();
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 lg:p-0">
@@ -340,7 +461,7 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
                     </div>
                     <div className="flex items-center gap-2">
                         <DollarSign size={14} className="text-lumina-accent shrink-0"/>
-                        <span>{bookingForm.price > 0 ? `Rp ${(bookingForm.price/1000).toFixed(0)}k` : '-'}</span>
+                        <span>{totals.total > 0 ? `Rp ${(totals.total/1000).toFixed(0)}k` : '-'}</span>
                     </div>
                 </div>
             </div>
@@ -405,7 +526,10 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
                                         <div><label className="text-xs font-bold text-lumina-muted mb-1 block">Full Name</label><input className="w-full bg-lumina-surface border border-lumina-highlight rounded-lg p-3 text-white focus:border-lumina-accent outline-none" value={newClientForm.name} onChange={e => setNewClientForm({...newClientForm, name: e.target.value})} /></div>
                                         <div><label className="text-xs font-bold text-lumina-muted mb-1 block">Phone</label><input className="w-full bg-lumina-surface border border-lumina-highlight rounded-lg p-3 text-white focus:border-lumina-accent outline-none" value={newClientForm.phone} onChange={e => setNewClientForm({...newClientForm, phone: e.target.value})} /></div>
                                     </div>
-                                    <div><label className="text-xs font-bold text-lumina-muted mb-1 block">Email</label><input className="w-full bg-lumina-surface border border-lumina-highlight rounded-lg p-3 text-white focus:border-lumina-accent outline-none" value={newClientForm.email} onChange={e => setNewClientForm({...newClientForm, email: e.target.value})} /></div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div><label className="text-xs font-bold text-lumina-muted mb-1 block">Email</label><input className="w-full bg-lumina-surface border border-lumina-highlight rounded-lg p-3 text-white focus:border-lumina-accent outline-none" value={newClientForm.email} onChange={e => setNewClientForm({...newClientForm, email: e.target.value})} /></div>
+                                        <div><label className="text-xs font-bold text-lumina-muted mb-1 block">Instagram (Optional)</label><input className="w-full bg-lumina-surface border border-lumina-highlight rounded-lg p-3 text-white focus:border-lumina-accent outline-none" placeholder="@username" value={newClientForm.instagram} onChange={e => setNewClientForm({...newClientForm, instagram: e.target.value})} /></div>
+                                    </div>
                                     <button onClick={handleCreateClient} className="w-full py-3 bg-lumina-accent text-lumina-base font-bold rounded-xl hover:bg-lumina-accent/90 transition-colors">Save Client</button>
                                 </div>
                             )}
@@ -448,7 +572,12 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
                                                 <label className="text-xs text-lumina-muted block mb-1">Date</label>
-                                                <div className="relative"><Calendar className="absolute left-3 top-2.5 text-lumina-muted w-4 h-4"/><input type="date" className="w-full bg-lumina-base border border-lumina-highlight rounded-lg pl-10 p-2 text-white text-sm focus:border-lumina-accent outline-none" value={bookingForm.date} onChange={e => setBookingForm({...bookingForm, date: e.target.value})} /></div>
+                                                <div className="relative"><Calendar className="absolute left-3 top-2.5 text-lumina-muted w-4 h-4"/><input type="date" min={getLocalDateString()} className="w-full bg-lumina-base border border-lumina-highlight rounded-lg pl-10 p-2 text-white text-sm focus:border-lumina-accent outline-none" value={bookingForm.date} onChange={e => {
+                                                    const selected = e.target.value;
+                                                    const today = getLocalDateString();
+                                                    if (selected < today) return; // Prevent past dates
+                                                    setBookingForm({...bookingForm, date: selected});
+                                                }} /></div>
                                             </div>
                                             <div>
                                                 <label className="text-xs text-lumina-muted block mb-1">Start Time</label>
@@ -458,7 +587,7 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
                                                 <label className="text-xs text-lumina-muted block mb-1">Duration (h)</label>
-                                                <input type="number" className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-2 text-white text-sm focus:border-lumina-accent outline-none" value={bookingForm.duration} onChange={e => setBookingForm({...bookingForm, duration: Number(e.target.value)})} />
+                                                <input type="number" min="1" className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-2 text-white text-sm focus:border-lumina-accent outline-none" value={bookingForm.duration} onChange={e => setBookingForm({...bookingForm, duration: Math.max(1, Number(e.target.value))})} />
                                             </div>
                                             <div>
                                                 <label className="text-xs text-lumina-muted block mb-1">Room</label>
@@ -510,27 +639,78 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
                             <div className="bg-white text-black rounded-xl overflow-hidden shadow-2xl max-w-md mx-auto relative">
                                 <div className="h-2 bg-lumina-accent w-full"></div>
                                 <div className="p-6">
-                                    <div className="flex justify-between items-center mb-6"><span className="font-black text-lg uppercase">Total Due</span><span className="font-black text-2xl font-mono tracking-tight">Rp {calculateTotal().toLocaleString()}</span></div>
+                                    <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
+                                        <span className="font-black text-lg uppercase">Total Due</span>
+                                        <div className="text-right">
+                                            <span className="font-black text-2xl font-mono tracking-tight block">Rp {totals.total.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                                            {totals.discountAmount > 0 && <span className="text-xs text-emerald-600 font-bold">Includes Discount</span>}
+                                        </div>
+                                    </div>
+
+                                    {/* Breakdown */}
+                                    <div className="space-y-2 mb-6 text-sm">
+                                        <div className="flex justify-between text-gray-500">
+                                            <span>Subtotal</span>
+                                            <span>Rp {totals.subtotal.toLocaleString()}</span>
+                                        </div>
+                                        
+                                        {/* Discount Control */}
+                                        <div className="flex justify-between items-center text-gray-500">
+                                            <button onClick={() => setShowDiscountInput(!showDiscountInput)} className="text-emerald-600 hover:underline font-bold text-xs flex items-center gap-1">
+                                                <Plus size={10} className={showDiscountInput ? 'rotate-45 transition-transform' : ''}/> {showDiscountInput ? 'Remove Discount' : 'Add Discount'}
+                                            </button>
+                                            {totals.discountAmount > 0 && <span className="text-emerald-600 font-bold">- Rp {totals.discountAmount.toLocaleString()}</span>}
+                                        </div>
+
+                                        {showDiscountInput && (
+                                            <div className="flex gap-2 p-2 bg-gray-50 rounded-lg animate-in slide-in-from-top-2">
+                                                <select 
+                                                    className="bg-white border border-gray-300 rounded text-xs p-1 focus:outline-none"
+                                                    value={discountForm.type}
+                                                    onChange={(e) => setDiscountForm({...discountForm, type: e.target.value as any})}
+                                                >
+                                                    <option value="FIXED">Rp (Fixed)</option>
+                                                    <option value="PERCENT">% (Percent)</option>
+                                                </select>
+                                                <input 
+                                                    type="number" 
+                                                    min="0"
+                                                    className="flex-1 bg-white border border-gray-300 rounded text-xs p-1 focus:outline-none"
+                                                    placeholder="Value"
+                                                    value={discountForm.value || ''}
+                                                    onChange={(e) => setDiscountForm({...discountForm, value: Math.max(0, Number(e.target.value))})}
+                                                />
+                                            </div>
+                                        )}
+
+                                        <div className="flex justify-between text-gray-500">
+                                            <span>Tax ({config.taxRate || 0}%)</span>
+                                            <span>Rp {totals.taxAmount.toLocaleString()}</span>
+                                        </div>
+                                    </div>
+
                                     <div className="bg-gray-100 p-4 rounded-lg space-y-3">
                                         <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2"><DollarSign size={14}/> Initial Deposit</label>
                                         <div className="flex gap-2">
                                             <div className="relative flex-1">
                                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-gray-400 text-sm">Rp</span>
-                                                <input type="number" className="w-full pl-8 pr-3 py-2 rounded border border-gray-300 text-sm font-bold focus:outline-none focus:border-black" value={paymentForm.amount} onChange={e => setPaymentForm({...paymentForm, amount: Number(e.target.value)})} />
+                                                <input type="number" min="0" className="w-full pl-8 pr-3 py-2 rounded border border-gray-300 text-sm font-bold focus:outline-none focus:border-black" value={paymentForm.amount} onChange={e => setPaymentForm({...paymentForm, amount: Math.max(0, Number(e.target.value))})} />
                                             </div>
-                                            <button onClick={() => setPaymentForm(p => ({...p, amount: calculateTotal() * 0.5}))} className="px-3 py-1 bg-white border border-gray-300 rounded text-xs font-bold hover:bg-gray-200">50%</button>
+                                            <button onClick={() => setPaymentForm(p => ({...p, amount: Math.floor(totals.total * 0.5)}))} className="px-3 py-1 bg-white border border-gray-300 rounded text-xs font-bold hover:bg-gray-200">50%</button>
                                         </div>
                                         {paymentForm.amount > 0 && (
                                             <div className="animate-in slide-in-from-top-2">
                                                 <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Deposit Account</label>
-                                                <select className="w-full p-2 rounded border border-gray-300 text-sm bg-white focus:outline-none focus:border-black" value={paymentForm.accountId} onChange={e => setPaymentForm({...paymentForm, accountId: e.target.value})}>
-                                                    <option value="" disabled>Select Account</option>
-                                                    {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
-                                                </select>
+                                                <CustomSelect 
+                                                    value={paymentForm.accountId}
+                                                    onChange={(val) => setPaymentForm({...paymentForm, accountId: val})}
+                                                    options={accounts.map(acc => ({ value: acc.id, label: acc.name }))}
+                                                    className="bg-white border-gray-300 text-black"
+                                                />
                                             </div>
                                         )}
                                     </div>
-                                    <div className="mt-4 flex items-center gap-2"><input type="checkbox" id="googleSync" checked={bookingForm.syncGoogle} disabled={!googleToken} onChange={(e) => setBookingForm({...bookingForm, syncGoogle: e.target.checked})} className="rounded border-gray-300 text-emerald-500 focus:ring-emerald-500"/><label htmlFor="googleSync" className={`text-xs font-bold uppercase ${googleToken ? 'text-gray-600' : 'text-gray-400'}`}>Sync to Google Calendar {googleToken ? '' : '(Not Connected)'}</label></div>
+                                    <div className="mt-4 flex items-center gap-2"><input type="checkbox" id="googleSync" checked={bookingForm.syncGoogle} onChange={(e) => setBookingForm({...bookingForm, syncGoogle: e.target.checked})} className="rounded border-gray-300 text-emerald-500 focus:ring-emerald-500"/><label htmlFor="googleSync" className="text-xs font-bold uppercase text-gray-600">Sync to Google Calendar (if connected)</label></div>
                                 </div>
                             </div>
                         </Motion.div>

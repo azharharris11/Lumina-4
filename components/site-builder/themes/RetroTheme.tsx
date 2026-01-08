@@ -2,6 +2,11 @@
 import React from 'react';
 import { SiteConfig, Package, User, SiteGalleryItem, SiteTestimonial, SiteFAQ, StudioConfig, PublicBookingSubmission, SitePage, SiteSection } from '../../../types';
 import BookingWidget from '../BookingWidget';
+import ContactBlock from '../blocks/ContactBlock';
+import TeamBlock from '../blocks/TeamBlock';
+import VideoBlock from '../blocks/VideoBlock';
+import RichTextBlock from '../blocks/RichTextBlock';
+import ServicesBlock from '../blocks/ServicesBlock';
 
 interface ThemeProps {
     site: SiteConfig;
@@ -64,12 +69,64 @@ const RetroTheme: React.FC<ThemeProps> = ({ site, activePage, packages, users, c
                     </div>
                 </div>
             );
+            case 'CONTACT_FORM': return (
+                <div key={section.id} className="mb-8 border-2 border-gray-600 border-r-white border-b-white p-4 bg-[#c0c0c0]">
+                    <div className="bg-blue-800 text-white px-2 py-1 text-xs font-bold mb-4">Message_Composer.exe</div>
+                    <ContactBlock 
+                        headline={section.content.headline}
+                        description={section.content.description}
+                        className="!p-0 !py-0"
+                        titleClassName="font-bold text-lg mb-2"
+                        inputClassName="bg-white border-2 border-gray-600 border-r-white border-b-white text-black font-mono text-xs"
+                        buttonClassName="bg-[#c0c0c0] border-2 border-white border-r-black border-b-black text-black font-bold text-xs active:border-black active:border-r-white active:border-b-white"
+                    />
+                </div>
+            );
+            case 'TEAM_GRID': 
+                const members = (section.content.items && section.content.items.length > 0) 
+                    ? section.content.items.map((item, idx) => ({ id: `manual-${idx}`, name: item.title, role: item.text, image: item.image || '' }))
+                    : users.filter(u => u.status === 'ACTIVE').map(u => ({ id: u.id, name: u.name, role: u.role, image: u.avatar }));
+                
+                return (
+                    <div key={section.id} className="mb-8">
+                        <h2 className="text-lg md:text-xl font-bold mb-4 border-b-2 border-black w-fit">:: TEAM_MEMBERS ::</h2>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {members.map(member => (
+                                <div key={member.id} className="bg-[#c0c0c0] border-2 border-white border-r-black border-b-black p-1 text-center">
+                                    <img src={member.image} className="w-full h-24 object-cover border border-gray-600 mb-1 grayscale" />
+                                    <p className="font-bold text-xs">{member.name}</p>
+                                    <p className="text-[10px]">{member.role}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            case 'VIDEO_EMBED': return (
+                <div key={section.id} className="mb-8 border-2 border-gray-600 border-r-white border-b-white p-1 bg-black">
+                     <VideoBlock 
+                        headline={section.content.headline}
+                        description={section.content.description}
+                        videoUrl={section.content.videoUrl || ''}
+                        className="!p-0 !py-0"
+                        titleClassName="text-white font-mono mb-2 px-2"
+                        descClassName="text-gray-400 font-mono px-2 text-xs"
+                    />
+                </div>
+            );
+            case 'RICH_TEXT': return (
+                <div key={section.id} className="mb-8 bg-white border-2 border-gray-600 border-r-white border-b-white p-4 font-mono text-xs overflow-auto h-64 resize-y">
+                     <RichTextBlock 
+                        html={section.content.html || ''}
+                        className="!p-0 !py-0 !max-w-none prose-sm font-mono"
+                    />
+                </div>
+            );
             default: return null;
         }
     });
 
     return (
-        <div className="bg-[#008080] text-black font-mono min-h-full p-1 md:p-2 overflow-x-hidden pb-12">
+        <div className="bg-[var(--site-bg)] text-black font-mono min-h-full p-1 md:p-2 overflow-x-hidden pb-12 transition-colors duration-300">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 p-1 md:p-2 h-full">
                 {/* Sidebar */}
                 <div className="md:col-span-3 space-y-4">

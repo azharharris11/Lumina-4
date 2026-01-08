@@ -4,6 +4,11 @@ import { motion, useScroll, useTransform } from 'framer-motion';
 import { SiteConfig, Package, User, SiteGalleryItem, SiteTestimonial, SiteFAQ, StudioConfig, PublicBookingSubmission, SitePage, SiteSection } from '../../../types';
 import ScrollReveal from '../ScrollReveal';
 import BookingWidget from '../BookingWidget';
+import ContactBlock from '../blocks/ContactBlock';
+import TeamBlock from '../blocks/TeamBlock';
+import VideoBlock from '../blocks/VideoBlock';
+import RichTextBlock from '../blocks/RichTextBlock';
+import GalleryBlock from '../blocks/GalleryBlock';
 
 const Motion = motion as any;
 
@@ -120,22 +125,75 @@ const HorizonTheme: React.FC<ThemeProps> = ({ site, activePage, packages, users,
                 case 'TEXT_IMAGE': return <div key={section.id}>{renderTextImage(section.content.headline || '', section.content.description || '', section.content.image || '', section.content.layout || 'LEFT')}</div>;
                 case 'FEATURES': return <div key={section.id}>{renderFeatures(section.content.headline || 'Key Features', section.content.items || [])}</div>;
                 case 'PRICING': return <div key={section.id}>{renderPricing(section.content.headline)}</div>;
-                // Reuse existing portfolio logic for GALLERY type
-                case 'GALLERY': return <div key={section.id}></div>; 
+                case 'CONTACT_FORM': return (
+                    <ContactBlock 
+                        key={section.id}
+                        headline={section.content.headline}
+                        description={section.content.description}
+                        className="bg-[#0f172a]"
+                        titleClassName="text-white"
+                        descClassName="text-slate-300"
+                        inputClassName="bg-[#1e293b] border-slate-700 text-white focus:border-blue-500"
+                        buttonClassName="bg-blue-600 text-white rounded-full hover:bg-blue-500 hover:shadow-lg hover:shadow-blue-500/20"
+                    />
+                );
+                case 'TEAM_GRID': 
+                    const members = (section.content.items && section.content.items.length > 0) 
+                        ? section.content.items.map((item, idx) => ({ id: `manual-${idx}`, name: item.title, role: item.text, image: item.image || '' }))
+                        : users.filter(u => u.status === 'ACTIVE').map(u => ({ id: u.id, name: u.name, role: u.role, image: u.avatar }));
+                    
+                    return (
+                        <TeamBlock 
+                            key={section.id}
+                            headline={section.content.headline}
+                            description={section.content.description}
+                            members={members}
+                            className="bg-[#1e293b]/50"
+                            titleClassName="text-white"
+                            descClassName="text-slate-300"
+                            cardClassName="bg-[#0f172a] p-4 rounded-xl border border-slate-700"
+                        />
+                    );
+                case 'VIDEO_EMBED': return (
+                    <VideoBlock 
+                        key={section.id}
+                        headline={section.content.headline}
+                        description={section.content.description}
+                        videoUrl={section.content.videoUrl || ''}
+                        titleClassName="text-white"
+                        descClassName="text-slate-300"
+                    />
+                );
+                case 'RICH_TEXT': return (
+                    <RichTextBlock 
+                        key={section.id}
+                        html={section.content.html || ''}
+                        className="prose-invert"
+                    />
+                );
+                case 'GALLERY': return (
+                    <GalleryBlock 
+                        key={section.id}
+                        headline={section.content.headline}
+                        images={site.gallery}
+                        className="bg-[#0f172a]"
+                        titleClassName="text-white"
+                    />
+                ); 
                 default: return null;
             }
         });
     };
 
     return (
-        <div className="bg-[#0f172a] text-white font-sans min-h-full overflow-x-hidden">
+        <div className="bg-[var(--site-bg)] text-[var(--site-text)] font-sans min-h-full overflow-x-hidden transition-colors duration-300">
             {/* Navigation */}
-            <nav className="absolute top-0 left-0 right-0 z-50 p-6 flex justify-between items-center bg-gradient-to-b from-black/50 to-transparent">
+            <nav className="absolute top-0 left-0 right-0 z-50 p-6 flex justify-between items-center bg-gradient-to-b from-[var(--site-bg)]/50 to-transparent">
                 <span onClick={() => onNavigate && onNavigate('HOME')} className="font-bold text-xl tracking-widest cursor-pointer">{site.title}</span>
-                <div className="hidden md:flex gap-6 text-xs font-bold uppercase tracking-widest text-blue-200">
-                    <button onClick={() => onNavigate && onNavigate('HOME')} className="hover:text-white transition-colors">Home</button>
+                <div className="hidden md:flex gap-6 text-xs font-bold uppercase tracking-widest opacity-60">
+                    <button onClick={() => onNavigate && onNavigate('HOME')} className="hover:opacity-100 transition-opacity">Home</button>
                     {site.pages?.map(page => (
-                        <button key={page.id} onClick={() => onNavigate && onNavigate(page.id)} className="hover:text-white transition-colors">{page.title}</button>
+                        <button key={page.id} onClick={() => onNavigate && onNavigate(page.id)} className="hover:opacity-100 transition-opacity">{page.title}</button>
                     ))}
                 </div>
             </nav>
@@ -182,3 +240,4 @@ const HorizonTheme: React.FC<ThemeProps> = ({ site, activePage, packages, users,
 }
 
 export default HorizonTheme;
+
