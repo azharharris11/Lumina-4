@@ -9,6 +9,12 @@ export default defineConfig(({ mode }) => {
         port: 3000,
         host: '0.0.0.0',
       },
+      // TAMBAHKAN BAGIAN INI (PREVIEW)
+      preview: {
+        allowedHosts: true, // Mengizinkan semua host (cocok untuk Cloud Run)
+        host: '0.0.0.0',
+        port: 8080,
+      },
       plugins: [react()],
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
