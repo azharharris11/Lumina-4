@@ -68,9 +68,11 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
               body: JSON.stringify(metadata)
           });
           if (res.ok) {
+              const newFolder = await res.json();
               setNewFolderName('');
               setShowNewFolderInput(false);
-              fetchDriveFolders(currentDriveFolderId);
+              // Automatically navigate into the new folder
+              setDriveBreadcrumbs(prev => [...prev, { id: newFolder.id, name: newFolder.name }]);
           }
       } catch (e) { console.error(e); } finally { setActionLoading(false); }
   };
@@ -222,7 +224,7 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
                     onClick={handleLinkCurrentFolder}
                     className="w-full px-4 py-3 bg-lumina-accent text-lumina-base font-bold text-sm rounded-lg hover:bg-lumina-accent/90"
                 >
-                    Select This Folder
+                    Select This Folder: "{driveBreadcrumbs[driveBreadcrumbs.length - 1].name}"
                 </button>
             </div>
         </Motion.div>
