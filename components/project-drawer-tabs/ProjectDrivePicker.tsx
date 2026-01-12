@@ -149,10 +149,19 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
       }
   };
 
+  const handleFolderClick = (folderId: string) => {
+      // Toggle selection: if clicking the already selected one, unselect it.
+      if (selectedFolderId === folderId) {
+          setSelectedFolderId(null);
+      } else {
+          setSelectedFolderId(folderId);
+      }
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
         <Motion.div 
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -240,7 +249,7 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
                                         className={`flex items-center justify-between p-2 rounded cursor-pointer group relative transition-colors
                                             ${selectedFolderId === folder.id ? 'bg-lumina-accent/20 border border-lumina-accent/50' : 'hover:bg-lumina-highlight border border-transparent'}
                                         `}
-                                        onClick={() => setSelectedFolderId(folder.id)}
+                                        onClick={() => handleFolderClick(folder.id)}
                                         onDoubleClick={() => handleNavigateDrive(folder)}
                                     >
                                         <div className="flex items-center gap-3 overflow-hidden flex-1">
