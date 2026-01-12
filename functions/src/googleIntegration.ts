@@ -59,7 +59,7 @@ export const getGoogleAuthURL = onCall({
   const oauth2Client = createOAuthClient();
   const scopes = [
     "https://www.googleapis.com/auth/calendar",
-    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/drive",
   ];
 
   const url = oauth2Client.generateAuthUrl({

@@ -2,6 +2,7 @@ import React, { useRef, useState, useMemo } from 'react';
 import { HardDrive, Plus, Upload, Loader2, Lock, MessageCircle, File, Trash2, Download, ExternalLink } from 'lucide-react';
 import { Booking, User, ActivityLog, BookingFile } from '../../types';
 import { uploadToGoogleDrive } from '../../utils/googleDriveUtils';
+import { useStudio } from '../../contexts/StudioContext'; // Import Context
 
 interface ProjectFilesProps {
   booking: Booking;
@@ -13,6 +14,7 @@ interface ProjectFilesProps {
 }
 
 const ProjectFiles: React.FC<ProjectFilesProps> = ({ booking, currentUser, onUpdateBooking, createLocalLog, onOpenDrivePicker, googleToken }) => {
+  const { addNotification } = useStudio(); // Use Context
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -33,7 +35,7 @@ const ProjectFiles: React.FC<ProjectFilesProps> = ({ booking, currentUser, onUpd
 
   const handleUploadClick = () => { 
       if (!booking.driveFolderId) {
-          alert("Please link a Google Drive folder first.");
+          // Alert is handled by UI logic below now, but keep as safe guard
           onOpenDrivePicker();
           return;
       }
@@ -79,6 +81,13 @@ const ProjectFiles: React.FC<ProjectFilesProps> = ({ booking, currentUser, onUpd
                   logs: [createLocalLog('UPLOAD', `Uploaded to Drive: ${file.name}`), ...(booking.logs || [])]
               });
 
+              // Success Notification
+              addNotification({
+                  type: 'SUCCESS',
+                  title: 'Upload Complete',
+                  message: `${file.name} saved to Google Drive.`
+              });
+
           } catch (error) {
               console.error("Drive Upload failed", error);
               alert("Upload to Google Drive failed. Check console for details.");
@@ -119,15 +128,26 @@ const ProjectFiles: React.FC<ProjectFilesProps> = ({ booking, currentUser, onUpd
                     </div>
                     <div>
                         <p className="font-bold text-white text-sm">Google Drive Folder</p>
-                        {booking.deliveryUrl ? (
+                        {!googleToken ? (
+                             <p className="text-xs text-rose-400 font-bold flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"/> Google Account Disconnected
+                             </p>
+                        ) : booking.deliveryUrl ? (
                             <a href={booking.deliveryUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-400 hover:underline truncate block max-w-[200px]">{booking.deliveryUrl}</a>
                         ) : (
-                            <p className="text-xs text-lumina-muted">Not connected yet.</p>
+                            <p className="text-xs text-lumina-muted">No specific folder linked yet.</p>
                         )}
                     </div>
                 </div>
                 <div className="flex gap-2 w-full lg:w-auto">
-                    {booking.deliveryUrl ? (
+                    {!googleToken ? (
+                        <button 
+                            onClick={() => alert("Please go to Settings > Profile & Account to connect your Google Account first.")}
+                            className="flex-1 px-4 py-2 bg-lumina-surface border border-rose-500/50 text-rose-400 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-2 hover:bg-rose-500/10"
+                        >
+                            Connect Account
+                        </button>
+                    ) : booking.deliveryUrl ? (
                         <a href={booking.deliveryUrl} target="_blank" rel="noreferrer" className="flex-1 text-center px-4 py-2 bg-lumina-surface border border-lumina-highlight hover:bg-lumina-highlight text-white text-xs font-bold rounded-lg transition-colors">
                             Open Folder
                         </a>
@@ -176,8 +196,11 @@ const ProjectFiles: React.FC<ProjectFilesProps> = ({ booking, currentUser, onUpd
             {/* Delivery Actions */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div 
-                    onClick={handleUploadClick}
-                    className={`p-4 border border-dashed border-lumina-highlight rounded-xl flex flex-col items-center justify-center text-center transition-colors bg-lumina-base/30 h-32 cursor-pointer group relative ${isUploading ? 'opacity-50 pointer-events-none' : 'hover:border-lumina-accent/50'}`}
+                    onClick={(!googleToken || !booking.driveFolderId) ? undefined : handleUploadClick}
+                    className={`p-4 border border-dashed border-lumina-highlight rounded-xl flex flex-col items-center justify-center text-center transition-colors bg-lumina-base/30 h-32 relative
+                        ${(!googleToken || !booking.driveFolderId) ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:border-lumina-accent/50 group'}
+                        ${isUploading ? 'opacity-50 pointer-events-none' : ''}
+                    `}
                 >
                     <input 
                         type="file" 
@@ -191,7 +214,9 @@ const ProjectFiles: React.FC<ProjectFilesProps> = ({ booking, currentUser, onUpd
                         <Upload className="text-lumina-muted group-hover:text-white mb-2 transition-colors" />
                     )}
                     <p className="text-sm font-bold text-white">{isUploading ? 'Uploading to Drive...' : 'Upload to Drive'}</p>
-                    <p className="text-xs text-lumina-muted">{isUploading ? 'Please wait' : 'Files save to your Google Drive'}</p>
+                    <p className="text-xs text-lumina-muted">
+                        {isUploading ? 'Please wait' : (!googleToken ? 'Connect Google Account First' : !booking.driveFolderId ? 'Link a Folder First' : 'Files save to your Google Drive')}
+                    </p>
                 </div>
                 
                 <div className="p-4 bg-lumina-base border border-lumina-highlight rounded-xl relative overflow-hidden">
