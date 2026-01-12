@@ -11,8 +11,11 @@ export default defineConfig(({ mode }) => {
       },
       // UPDATE BAGIAN INI
       preview: {
-        // Jangan pakai 'true', tapi copy-paste domain dari pesan error kamu
-        allowedHosts: ['lumina-31263065340.us-central1.run.app'], 
+        allowedHosts: [
+          'lumina-31263065340.us-central1.run.app', // Domain asli Cloud Run
+          'luminaphotocrm.com',                      // Domain custom kamu
+          'www.luminaphotocrm.com', 'app.luminaphotocrm',                   // (Opsional) jika pakai www
+        ], 
         host: '0.0.0.0',
         port: 8080,
       },
