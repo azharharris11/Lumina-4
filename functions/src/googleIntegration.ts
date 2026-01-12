@@ -168,26 +168,25 @@ export const getGoogleAccessToken = onCall({
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "User must be logged in.");
   }
-  
+
   const userId = request.auth.uid;
-  const db = getFirestore();
-  
+
   try {
     const clientId = googleClientId.value();
     const clientSecret = googleClientSecret.value();
     const redirectUri = googleRedirectUri.value();
 
     const client = await getAuthenticatedClient(userId, clientId, clientSecret, redirectUri);
-    
+
     if (!client) {
-        throw new HttpsError("not-found", "Google account not connected.");
+      throw new HttpsError("not-found", "Google account not connected.");
     }
 
     // Force a token check (will refresh if needed via the listener setup in getAuthenticatedClient)
     const { token } = await client.getAccessToken();
 
     if (!token) {
-        throw new HttpsError("unavailable", "Failed to retrieve access token.");
+      throw new HttpsError("unavailable", "Failed to retrieve access token.");
     }
 
     return { accessToken: token };
