@@ -21,7 +21,9 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
   const [driveBreadcrumbs, setDriveBreadcrumbs] = useState<DriveFolder[]>([{id: 'root', name: 'My Drive'}]);
   const [driveFolderList, setDriveFolderList] = useState<DriveFolder[]>([]);
   const [isLoadingDrive, setIsLoadingDrive] = useState(false);
-  const [authError, setAuthError] = useState(false); // NEW: Track auth errors
+  const [authError, setAuthError] = useState(false); // Track 401
+  const [errorMsg, setErrorMsg] = useState<string | null>(null); // Track other errors (403, 500, etc)
+  
   const [showNewFolderInput, setShowNewFolderInput] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [renamingItem, setRenamingItem] = useState<DriveFolder | null>(null);
@@ -29,18 +31,19 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   
-  // New State for Selection
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
-
+  // State for Selection removed - simplifying to "Browse & Select Current" model
+  
   const currentDriveFolderId = driveBreadcrumbs[driveBreadcrumbs.length - 1].id;
+  const currentDriveFolderName = driveBreadcrumbs[driveBreadcrumbs.length - 1].name;
 
   const fetchDriveFolders = async (parentId: string) => {
       if (!googleToken) return;
       setIsLoadingDrive(true);
       setAuthError(false);
+      setErrorMsg(null);
+      
       try {
           const query = `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-          // ADDED: support for all drives/shared drives
           const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)&orderBy=name&includeItemsFromAllDrives=true&supportsAllDrives=true`;
           
           const res = await fetch(url, { headers: { 'Authorization': `Bearer ${googleToken}` } });
@@ -49,43 +52,57 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
               setAuthError(true);
               return;
           }
+
+          if (!res.ok) {
+              const text = await res.text();
+              console.error("Drive API Error:", text);
+              
+              if (res.status === 403) {
+                  setErrorMsg("Access Denied (403). Your token might lack 'Full Drive Access' scope. Please Disconnect & Reconnect in Settings.");
+              } else {
+                  setErrorMsg(`Error ${res.status}: ${text}`);
+              }
+              return;
+          }
           
-          if (!res.ok) return;
           const data = await res.json();
           setDriveFolderList(data.files || []);
-      } catch (e) { console.error(e); } finally { setIsLoadingDrive(false); }
+      } catch (e: any) { 
+          console.error(e); 
+          setErrorMsg(e.message || "Network Error");
+      } finally { 
+          setIsLoadingDrive(false); 
+      }
   };
 
   useEffect(() => {
       if(isOpen) {
           fetchDriveFolders(currentDriveFolderId);
-          setSelectedFolderId(null); // Reset selection on open/nav
       } else {
           // Reset on close
           setDriveBreadcrumbs([{id: 'root', name: 'My Drive'}]);
           setDriveFolderList([]);
-          setSelectedFolderId(null);
           setAuthError(false);
+          setErrorMsg(null);
       }
   }, [isOpen, currentDriveFolderId]);
 
   const handleNavigateDrive = (folder: DriveFolder) => { 
       setDriveBreadcrumbs(prev => [...prev, folder]); 
       setActiveMenuId(null); 
-      setSelectedFolderId(null);
   };
   
   const handleDriveBack = () => { 
       if (driveBreadcrumbs.length > 1) { 
           setDriveBreadcrumbs(prev => prev.slice(0, -1)); 
           setActiveMenuId(null); 
-          setSelectedFolderId(null);
       } 
   };
 
   const createSubFolder = async () => {
       if (!newFolderName.trim() || !googleToken) return;
       setActionLoading(true);
+      setErrorMsg(null);
       try {
           const metadata = { name: newFolderName, mimeType: 'application/vnd.google-apps.folder', parents: [currentDriveFolderId] };
           const res = await fetch('https://www.googleapis.com/drive/v3/files', {
@@ -95,6 +112,11 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
           });
           
           if (res.status === 401) { setAuthError(true); return; }
+          if (!res.ok) {
+              const text = await res.text();
+              setErrorMsg(`Create Failed: ${text}`);
+              return;
+          }
 
           if (res.ok) {
               const newFolder = await res.json();
@@ -103,7 +125,10 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
               // Automatically navigate into the new folder
               setDriveBreadcrumbs(prev => [...prev, { id: newFolder.id, name: newFolder.name }]);
           }
-      } catch (e) { console.error(e); } finally { setActionLoading(false); }
+      } catch (e: any) { 
+        console.error(e);
+        setErrorMsg(e.message);
+      } finally { setActionLoading(false); }
   };
 
   const renameItem = async () => {
@@ -139,24 +164,7 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
   };
 
   const handleConfirmSelection = () => {
-      if (selectedFolderId) {
-          // Select the highlighted child folder
-          const folder = driveFolderList.find(f => f.id === selectedFolderId);
-          if (folder) onSelectFolder(folder.id, folder.name);
-      } else {
-          // Select the current parent folder
-          const folderName = driveBreadcrumbs[driveBreadcrumbs.length - 1].name;
-          onSelectFolder(currentDriveFolderId, folderName);
-      }
-  };
-
-  const handleFolderClick = (folderId: string) => {
-      // Toggle selection: if clicking the already selected one, unselect it.
-      if (selectedFolderId === folderId) {
-          setSelectedFolderId(null);
-      } else {
-          setSelectedFolderId(folderId);
-      }
+      onSelectFolder(currentDriveFolderId, currentDriveFolderName);
   };
 
   if (!isOpen) return null;
@@ -171,7 +179,7 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
         >
             <div className="p-4 border-b border-lumina-highlight flex justify-between items-center bg-lumina-base rounded-t-xl">
                 <div>
-                    <h3 className="font-bold text-white flex items-center gap-2 text-sm">Select Drive Folder</h3>
+                    <h3 className="font-bold text-white flex items-center gap-2 text-sm">Browse Drive</h3>
                     {googleToken && !authError && (
                         <div className="flex items-center gap-1 text-xs text-lumina-muted mt-1 overflow-x-auto no-scrollbar max-w-[200px]">
                             {driveBreadcrumbs.map((crumb, i) => (
@@ -203,16 +211,18 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
                 </div>
             </div>
 
-            {!googleToken || authError ? (
+            {!googleToken || authError || errorMsg ? (
                 <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
                     <div className="w-16 h-16 bg-rose-500/10 rounded-full flex items-center justify-center mb-4">
                          <Trash2 size={32} className="text-rose-500" />
                     </div>
-                    <h3 className="text-white font-bold text-lg mb-2">Connection Error</h3>
-                    <p className="text-lumina-muted text-sm mb-6">
+                    <h3 className="text-white font-bold text-lg mb-2">
+                        {authError ? "Connection Error" : "API Error"}
+                    </h3>
+                    <p className="text-lumina-muted text-sm mb-6 max-w-xs mx-auto">
                         {authError 
                             ? "Your Google session has expired. Please reconnect in Settings." 
-                            : "Your Google Account is not connected."}
+                            : errorMsg || "Your Google Account is not connected."}
                     </p>
                     <button onClick={onClose} className="px-6 py-2 bg-lumina-highlight hover:bg-white hover:text-black text-white rounded-lg font-bold transition-colors">
                         Close
@@ -247,14 +257,11 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
                                 {driveFolderList.map(folder => (
                                     <div 
                                         key={folder.id} 
-                                        className={`flex items-center justify-between p-2 rounded cursor-pointer group relative transition-colors
-                                            ${selectedFolderId === folder.id ? 'bg-lumina-accent/20 border border-lumina-accent/50' : 'hover:bg-lumina-highlight border border-transparent'}
-                                        `}
-                                        onClick={() => handleFolderClick(folder.id)}
-                                        onDoubleClick={() => handleNavigateDrive(folder)}
+                                        className="flex items-center justify-between p-2 hover:bg-lumina-highlight rounded cursor-pointer group relative transition-colors"
+                                        onClick={() => handleNavigateDrive(folder)}
                                     >
                                         <div className="flex items-center gap-3 overflow-hidden flex-1">
-                                            <Folder className={`shrink-0 ${selectedFolderId === folder.id ? 'text-lumina-accent fill-lumina-accent/20' : 'text-blue-400 fill-blue-400/20'}`} size={18} />
+                                            <Folder className="shrink-0 text-blue-400 fill-blue-400/20" size={18} />
                                             {renamingItem?.id === folder.id ? (
                                                 <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                                                     <input 
@@ -267,18 +274,12 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
                                                     <button onClick={renameItem} className="text-xs bg-lumina-accent text-black px-2 rounded">Save</button>
                                                 </div>
                                             ) : (
-                                                <span className={`text-sm truncate ${selectedFolderId === folder.id ? 'text-white font-bold' : 'text-white'}`}>{folder.name}</span>
+                                                <span className="text-sm text-white truncate font-medium">{folder.name}</span>
                                             )}
                                         </div>
                                         
                                         <div className="flex items-center gap-1">
-                                            <button 
-                                                className="p-1 text-lumina-muted hover:text-white"
-                                                title="Open Folder"
-                                                onClick={(e) => { e.stopPropagation(); handleNavigateDrive(folder); }}
-                                            >
-                                                <ChevronRight size={16} />
-                                            </button>
+                                            <ChevronRight size={16} className="text-lumina-muted" />
 
                                             <div className="relative" onClick={e => e.stopPropagation()}>
                                                 <button 
@@ -298,7 +299,10 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
                                     </div>
                                 ))}
                                 {driveFolderList.length === 0 && (
-                                    <p className="text-center text-lumina-muted text-sm py-8">No sub-folders found.</p>
+                                    <div className="text-center py-8">
+                                        <Folder className="w-12 h-12 text-lumina-surface mx-auto mb-2" />
+                                        <p className="text-lumina-muted text-sm">This folder is empty.</p>
+                                    </div>
                                 )}
                             </div>
                         )}
@@ -309,10 +313,7 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
                             onClick={handleConfirmSelection}
                             className="w-full px-4 py-3 bg-lumina-accent text-lumina-base font-bold text-sm rounded-lg hover:bg-lumina-accent/90"
                         >
-                            {selectedFolderId 
-                                ? `Select Folder: "${driveFolderList.find(f => f.id === selectedFolderId)?.name}"`
-                                : `Select Current: "${driveBreadcrumbs[driveBreadcrumbs.length - 1].name}"`
-                            }
+                            Select This Folder: "{currentDriveFolderName}"
                         </button>
                     </div>
                 </>
