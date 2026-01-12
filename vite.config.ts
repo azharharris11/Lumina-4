@@ -9,9 +9,10 @@ export default defineConfig(({ mode }) => {
         port: 3000,
         host: '0.0.0.0',
       },
-      // TAMBAHKAN BAGIAN INI (PREVIEW)
+      // UPDATE BAGIAN INI
       preview: {
-        allowedHosts: true, // Mengizinkan semua host (cocok untuk Cloud Run)
+        // Jangan pakai 'true', tapi copy-paste domain dari pesan error kamu
+        allowedHosts: ['lumina-31263065340.us-central1.run.app'], 
         host: '0.0.0.0',
         port: 8080,
       },
