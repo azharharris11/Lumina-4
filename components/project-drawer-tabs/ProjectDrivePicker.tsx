@@ -40,7 +40,8 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
       setAuthError(false);
       try {
           const query = `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-          const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)&orderBy=name`;
+          // ADDED: support for all drives/shared drives
+          const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)&orderBy=name&includeItemsFromAllDrives=true&supportsAllDrives=true`;
           
           const res = await fetch(url, { headers: { 'Authorization': `Bearer ${googleToken}` } });
           
