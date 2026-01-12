@@ -113,7 +113,12 @@ const ProjectDrawer: React.FC<ProjectDrawerProps> = ({ isOpen, onClose, booking,
   const handleSelectFolder = (folderId: string, folderName: string) => { 
       if (booking) { 
           const folderLink = `https://drive.google.com/drive/u/0/folders/${folderId}`; 
-          onUpdateBooking({ ...booking, deliveryUrl: folderLink, logs: [createLocalLog('DRIVE_LINK', `Linked Drive folder: ${folderName}`), ...(booking.logs || [])] }); 
+          onUpdateBooking({ 
+            ...booking, 
+            deliveryUrl: folderLink, 
+            driveFolderId: folderId,
+            logs: [createLocalLog('DRIVE_LINK', `Linked Drive folder: ${folderName}`), ...(booking.logs || [])] 
+          }); 
           setShowDrivePicker(false); 
       } 
   };
@@ -274,6 +279,7 @@ const ProjectDrawer: React.FC<ProjectDrawerProps> = ({ isOpen, onClose, booking,
                     onUpdateBooking={onUpdateBooking} 
                     createLocalLog={createLocalLog}
                     onOpenDrivePicker={() => setShowDrivePicker(true)}
+                    googleToken={googleToken}
                 />
             )}
 

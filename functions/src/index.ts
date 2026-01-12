@@ -5,13 +5,13 @@ import {initializeApp} from "firebase-admin/app";
 import {getFirestore} from "firebase-admin/firestore";
 // import * as nodemailer from "nodemailer";
 
-import { getGoogleAuthURL, googleAuthCallback, disconnectGoogle, googleClientId, googleClientSecret, googleRedirectUri, getAuthenticatedClient } from "./googleIntegration";
+import { getGoogleAuthURL, googleAuthCallback, disconnectGoogle, getGoogleAccessToken, googleClientId, googleClientSecret, googleRedirectUri, getAuthenticatedClient } from "./googleIntegration";
 
 initializeApp();
 const db = getFirestore();
 
 // Export Google Auth Functions
-export { getGoogleAuthURL, googleAuthCallback, disconnectGoogle };
+export { getGoogleAuthURL, googleAuthCallback, disconnectGoogle, getGoogleAccessToken };
 
 // ... (existing imports and code)
 

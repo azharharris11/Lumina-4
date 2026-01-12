@@ -160,3 +160,39 @@ export async function getAuthenticatedClient(
 
   return oauth2Client;
 }
+
+export const getGoogleAccessToken = onCall({
+  cors: true,
+  secrets: [googleClientId, googleClientSecret, googleRedirectUri],
+}, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "User must be logged in.");
+  }
+  
+  const userId = request.auth.uid;
+  const db = getFirestore();
+  
+  try {
+    const clientId = googleClientId.value();
+    const clientSecret = googleClientSecret.value();
+    const redirectUri = googleRedirectUri.value();
+
+    const client = await getAuthenticatedClient(userId, clientId, clientSecret, redirectUri);
+    
+    if (!client) {
+        throw new HttpsError("not-found", "Google account not connected.");
+    }
+
+    // Force a token check (will refresh if needed via the listener setup in getAuthenticatedClient)
+    const { token } = await client.getAccessToken();
+
+    if (!token) {
+        throw new HttpsError("unavailable", "Failed to retrieve access token.");
+    }
+
+    return { accessToken: token };
+  } catch (error) {
+    logger.error("Error retrieving Google Access Token", error);
+    throw new HttpsError("internal", "Failed to get access token.");
+  }
+});

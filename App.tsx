@@ -29,7 +29,8 @@ import { ShieldAlert } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import { useStudio } from './contexts/StudioContext';
 import { doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore'; 
-import { db } from './firebase';
+import { db, functions } from './firebase';
+import { httpsCallable } from 'firebase/functions';
 
 const Motion = motion as any;
 
@@ -95,6 +96,36 @@ const App: React.FC = () => {
   const [publicConfig, setPublicConfig] = useState<any>(null);
   const [isPublicLoading, setIsPublicLoading] = useState(false);
   const [publicError, setPublicError] = useState<string | null>(null);
+
+  // Fetch Google Token if User is Connected
+  useEffect(() => {
+    const fetchToken = async () => {
+        if (currentUser?.isGoogleConnected) {
+            try {
+                const getToken = httpsCallable(functions, 'getGoogleAccessToken');
+                const result = await getToken();
+                const { accessToken } = result.data as { accessToken: string };
+                setGoogleToken(accessToken);
+                localStorage.setItem('lumina_g_token', accessToken);
+            } catch (e) {
+                console.error("Failed to fetch Google Token:", e);
+                // Don't clear immediately, maybe just network error.
+            }
+        } else if (currentUser && !currentUser.isGoogleConnected) {
+            setGoogleToken(null);
+            localStorage.removeItem('lumina_g_token');
+        }
+    };
+    
+    fetchToken();
+    
+    // Refresh token every 45 minutes if connected
+    const interval = setInterval(() => {
+        if(currentUser?.isGoogleConnected) fetchToken();
+    }, 45 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [currentUser?.isGoogleConnected, currentUser?.id]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);

@@ -1,8 +1,7 @@
-
 import React, { useRef, useState, useMemo } from 'react';
 import { HardDrive, Plus, Upload, Loader2, Lock, MessageCircle, File, Trash2, Download, ExternalLink } from 'lucide-react';
 import { Booking, User, ActivityLog, BookingFile } from '../../types';
-import { uploadFile } from '../../utils/storageUtils';
+import { uploadToGoogleDrive } from '../../utils/googleDriveUtils';
 
 interface ProjectFilesProps {
   booking: Booking;
@@ -10,9 +9,10 @@ interface ProjectFilesProps {
   onUpdateBooking: (booking: Booking) => void;
   createLocalLog: (action: string, details?: string) => ActivityLog;
   onOpenDrivePicker: () => void;
+  googleToken?: string | null;
 }
 
-const ProjectFiles: React.FC<ProjectFilesProps> = ({ booking, currentUser, onUpdateBooking, createLocalLog, onOpenDrivePicker }) => {
+const ProjectFiles: React.FC<ProjectFilesProps> = ({ booking, currentUser, onUpdateBooking, createLocalLog, onOpenDrivePicker, googleToken }) => {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -32,23 +32,43 @@ const ProjectFiles: React.FC<ProjectFilesProps> = ({ booking, currentUser, onUpd
   }, [booking]);
 
   const handleUploadClick = () => { 
+      if (!booking.driveFolderId) {
+          alert("Please link a Google Drive folder first.");
+          onOpenDrivePicker();
+          return;
+      }
+      if (!googleToken) {
+        alert("Google Account not connected or token expired. Please reconnect in Settings.");
+        return;
+      }
       fileInputRef.current?.click(); 
   };
 
-  const handleUploadToStorage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUploadToDrive = async (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) {
+          const file = e.target.files[0];
+          
+          if (!booking.driveFolderId) {
+            alert("No Google Drive folder linked.");
+            return;
+          }
+          if (!googleToken) {
+            alert("Missing Google Access Token.");
+            return;
+          }
+
           setIsUploading(true);
           try {
-              const file = e.target.files[0];
-              // Upload to Firebase Storage: projects/{bookingId}/{filename}
-              const url = await uploadFile(file, `projects/${booking.id}`, file.name);
+              // Upload to Google Drive
+              const driveFile = await uploadToGoogleDrive(file, booking.driveFolderId, googleToken);
               
               const newFile: BookingFile = {
-                  id: `f-${Date.now()}`,
-                  name: file.name,
-                  url: url,
+                  id: driveFile.id,
+                  name: driveFile.name,
+                  url: driveFile.webViewLink,
                   type: 'DELIVERABLE',
-                  uploadedAt: new Date().toISOString()
+                  uploadedAt: new Date().toISOString(),
+                  source: 'GOOGLE_DRIVE'
               };
 
               const updatedFiles = [...(booking.files || []), newFile];
@@ -56,12 +76,12 @@ const ProjectFiles: React.FC<ProjectFilesProps> = ({ booking, currentUser, onUpd
               onUpdateBooking({ 
                   ...booking, 
                   files: updatedFiles,
-                  logs: [createLocalLog('UPLOAD', `Uploaded file: ${file.name}`), ...(booking.logs || [])]
+                  logs: [createLocalLog('UPLOAD', `Uploaded to Drive: ${file.name}`), ...(booking.logs || [])]
               });
 
           } catch (error) {
-              console.error("Upload failed", error);
-              alert("Upload failed. Please try again.");
+              console.error("Drive Upload failed", error);
+              alert("Upload to Google Drive failed. Check console for details.");
           } finally {
               setIsUploading(false);
               // Reset input
@@ -71,7 +91,8 @@ const ProjectFiles: React.FC<ProjectFilesProps> = ({ booking, currentUser, onUpd
   };
 
   const handleDeleteFile = (fileId: string) => {
-      if(window.confirm("Delete this file?")) {
+      // Note: This only removes the link from the project, not the file from Drive (unless we add that logic)
+      if(window.confirm("Remove this file link? (File remains in Drive)")) {
           const updatedFiles = (booking.files || []).filter(f => f.id !== fileId);
           onUpdateBooking({
               ...booking,
@@ -88,18 +109,18 @@ const ProjectFiles: React.FC<ProjectFilesProps> = ({ booking, currentUser, onUpd
   return (
     <div className="space-y-6">
         <div className="bg-lumina-surface border border-lumina-highlight rounded-2xl p-6">
-            <h3 className="font-bold text-white mb-4 flex items-center gap-2"><HardDrive size={18} className="text-lumina-accent"/> Project Files</h3>
+            <h3 className="font-bold text-white mb-4 flex items-center gap-2"><HardDrive size={18} className="text-lumina-accent"/> Project Files (Google Drive)</h3>
             
             {/* Drive Link Section */}
             <div className="p-4 bg-lumina-base border border-lumina-highlight rounded-xl flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
-                        <img src="https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg" className="w-6 h-6" />
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg" className="w-6 h-6" alt="Drive" />
                     </div>
                     <div>
                         <p className="font-bold text-white text-sm">Google Drive Folder</p>
                         {booking.deliveryUrl ? (
-                            <a href={booking.deliveryUrl} target="_blank" className="text-xs text-blue-400 hover:underline truncate block max-w-[200px]">{booking.deliveryUrl}</a>
+                            <a href={booking.deliveryUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-400 hover:underline truncate block max-w-[200px]">{booking.deliveryUrl}</a>
                         ) : (
                             <p className="text-xs text-lumina-muted">Not connected yet.</p>
                         )}
@@ -107,7 +128,7 @@ const ProjectFiles: React.FC<ProjectFilesProps> = ({ booking, currentUser, onUpd
                 </div>
                 <div className="flex gap-2 w-full lg:w-auto">
                     {booking.deliveryUrl ? (
-                        <a href={booking.deliveryUrl} target="_blank" className="flex-1 text-center px-4 py-2 bg-lumina-surface border border-lumina-highlight hover:bg-lumina-highlight text-white text-xs font-bold rounded-lg transition-colors">
+                        <a href={booking.deliveryUrl} target="_blank" rel="noreferrer" className="flex-1 text-center px-4 py-2 bg-lumina-surface border border-lumina-highlight hover:bg-lumina-highlight text-white text-xs font-bold rounded-lg transition-colors">
                             Open Folder
                         </a>
                     ) : (
@@ -115,7 +136,7 @@ const ProjectFiles: React.FC<ProjectFilesProps> = ({ booking, currentUser, onUpd
                             onClick={onOpenDrivePicker}
                             className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-2"
                         >
-                            <Plus size={14}/> Create / Link Folder
+                            <Plus size={14}/> Link Folder
                         </button>
                     )}
                 </div>
@@ -123,9 +144,9 @@ const ProjectFiles: React.FC<ProjectFilesProps> = ({ booking, currentUser, onUpd
 
             {/* Uploaded Files List */}
             <div className="mb-6 space-y-2">
-                <h4 className="text-xs font-bold text-lumina-muted uppercase mb-2">Uploaded Deliverables</h4>
+                <h4 className="text-xs font-bold text-lumina-muted uppercase mb-2">Files</h4>
                 {(!booking.files || booking.files.length === 0) && (
-                    <p className="text-sm text-lumina-muted/50 italic">No files uploaded directly.</p>
+                    <p className="text-sm text-lumina-muted/50 italic">No files linked.</p>
                 )}
                 {booking.files?.map((file) => (
                     <div key={file.id} className="flex items-center justify-between p-3 bg-lumina-base/50 border border-lumina-highlight rounded-lg group">
@@ -135,14 +156,16 @@ const ProjectFiles: React.FC<ProjectFilesProps> = ({ booking, currentUser, onUpd
                             </div>
                             <div className="min-w-0">
                                 <p className="text-sm font-bold text-white truncate">{file.name}</p>
-                                <p className="text-[10px] text-lumina-muted">{new Date(file.uploadedAt).toLocaleDateString()} • Direct Upload</p>
+                                <p className="text-[10px] text-lumina-muted">
+                                    {new Date(file.uploadedAt).toLocaleDateString()} • {file.source === 'GOOGLE_DRIVE' ? 'Google Drive' : 'Storage'}
+                                </p>
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-lumina-highlight rounded text-lumina-muted hover:text-white transition-colors" title="Download">
-                                <Download size={14} />
+                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-lumina-highlight rounded text-lumina-muted hover:text-white transition-colors" title="View/Download">
+                                {file.source === 'GOOGLE_DRIVE' ? <ExternalLink size={14} /> : <Download size={14} />}
                             </a>
-                            <button onClick={() => handleDeleteFile(file.id)} className="p-2 hover:bg-rose-500/20 rounded text-lumina-muted hover:text-rose-500 transition-colors" title="Delete">
+                            <button onClick={() => handleDeleteFile(file.id)} className="p-2 hover:bg-rose-500/20 rounded text-lumina-muted hover:text-rose-500 transition-colors" title="Remove Link">
                                 <Trash2 size={14} />
                             </button>
                         </div>
@@ -160,15 +183,15 @@ const ProjectFiles: React.FC<ProjectFilesProps> = ({ booking, currentUser, onUpd
                         type="file" 
                         ref={fileInputRef} 
                         className="hidden" 
-                        onChange={handleUploadToStorage} 
+                        onChange={handleUploadToDrive} 
                     />
                     {isUploading ? (
                         <Loader2 className="animate-spin text-lumina-accent mb-2" />
                     ) : (
                         <Upload className="text-lumina-muted group-hover:text-white mb-2 transition-colors" />
                     )}
-                    <p className="text-sm font-bold text-white">{isUploading ? 'Uploading...' : 'Upload File'}</p>
-                    <p className="text-xs text-lumina-muted">{isUploading ? 'Please wait' : 'Click to upload to project storage'}</p>
+                    <p className="text-sm font-bold text-white">{isUploading ? 'Uploading to Drive...' : 'Upload to Drive'}</p>
+                    <p className="text-xs text-lumina-muted">{isUploading ? 'Please wait' : 'Files save to your Google Drive'}</p>
                 </div>
                 
                 <div className="p-4 bg-lumina-base border border-lumina-highlight rounded-xl relative overflow-hidden">
@@ -180,8 +203,8 @@ const ProjectFiles: React.FC<ProjectFilesProps> = ({ booking, currentUser, onUpd
                     </div>
                     <p className="text-xs text-lumina-muted mb-4">
                         {isPaymentSettled 
-                            ? "Payment complete. You can share the portal or files." 
-                            : "Outstanding balance detected. Download access restricted."}
+                            ? "Payment complete. Share the folder link with your client." 
+                            : "Outstanding balance detected. Ensure payment before sharing."}
                     </p>
                     <button 
                         disabled={!isPaymentSettled && currentUser?.role !== 'OWNER'}

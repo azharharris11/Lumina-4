@@ -129,6 +129,7 @@ export interface BookingFile {
     url: string;
     type: 'CONTRACT' | 'INVOICE' | 'RECEIPT' | 'DELIVERABLE';
     uploadedAt: string;
+    source?: 'FIREBASE' | 'GOOGLE_DRIVE';
 }
 
 export interface BookingComment {
@@ -171,6 +172,7 @@ export interface Booking {
   notes?: string;
   discount?: Discount;
   deliveryUrl?: string; 
+  driveFolderId?: string;
   tasks?: BookingTask[];
   logs?: ActivityLog[];
   files?: BookingFile[];
