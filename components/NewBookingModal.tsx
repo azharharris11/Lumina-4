@@ -349,31 +349,6 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
       }
   };
 
-  const calculateTotal = () => {
-      let subtotal = bookingForm.price;
-      
-      // Apply Discount
-      let discountAmount = 0;
-      if (discountForm.value > 0) {
-          if (discountForm.type === 'PERCENT') {
-              discountAmount = subtotal * (discountForm.value / 100);
-          } else {
-              discountAmount = discountForm.value;
-          }
-      }
-      
-      const taxableAmount = Math.max(0, subtotal - discountAmount);
-      const tax = config.taxRate || 0;
-      const taxAmount = taxableAmount * (tax / 100);
-      
-      return {
-          subtotal,
-          discountAmount,
-          taxAmount,
-          total: taxableAmount + taxAmount
-      };
-  };
-
   const isStepValid = () => {
       if (step === 1) return !!selectedClient;
       if (step === 2) return !!bookingForm.packageId && !!bookingForm.date && !!bookingForm.timeStart && !conflictError;

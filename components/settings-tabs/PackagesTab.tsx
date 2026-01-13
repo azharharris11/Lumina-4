@@ -161,7 +161,46 @@ const PackagesTab: React.FC<PackagesTabProps> = ({ packages, onAddPackage, onUpd
             {/* PACKAGE LIST GRID */}
             <div className="space-y-8">
                 {Object.entries(groupedPackages).map(([category, pkgs]: [string, Package[]]) => (
-                    // ... (keep existing mapping)
+                    <div key={category}>
+                        <h3 className="text-sm font-bold text-lumina-muted uppercase tracking-wider mb-3 pl-1 border-l-2 border-lumina-accent/50">{category}</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {pkgs.map(pkg => (
+                                <div key={pkg.id} className={`p-5 rounded-2xl border transition-all group hover:shadow-lg ${pkg.active ? 'bg-lumina-base border-lumina-highlight hover:border-lumina-accent/50' : 'bg-lumina-base/30 border-lumina-highlight/30 opacity-60'}`}>
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div>
+                                            <h4 className="font-bold text-white text-lg">{pkg.name}</h4>
+                                            <div className="flex gap-2 mt-1">
+                                                <span className="text-[10px] bg-lumina-surface px-2 py-0.5 rounded border border-lumina-highlight text-lumina-muted">{pkg.duration} Hours</span>
+                                                <span className="text-[10px] bg-lumina-surface px-2 py-0.5 rounded border border-lumina-highlight text-lumina-muted">{pkg.turnaroundDays} Days Turnaround</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button onClick={() => toggleActive(pkg)} className="p-1.5 bg-lumina-surface rounded text-lumina-muted hover:text-white" title={pkg.active ? "Deactivate" : "Activate"}><RefreshCcw size={14}/></button>
+                                            <button onClick={() => openEditor(pkg)} className="p-1.5 bg-lumina-surface rounded text-lumina-muted hover:text-white"><Edit2 size={14}/></button>
+                                            <button onClick={() => handleArchive(pkg)} className="p-1.5 bg-lumina-surface rounded text-lumina-muted hover:text-rose-500"><Archive size={14}/></button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex flex-wrap gap-1 mb-4 h-12 overflow-hidden content-start">
+                                        {pkg.features.slice(0, 3).map((f, i) => (
+                                            <span key={i} className="text-[10px] text-lumina-muted px-1.5 py-0.5 border border-lumina-highlight rounded bg-lumina-base/50">{f}</span>
+                                        ))}
+                                        {pkg.features.length > 3 && <span className="text-[10px] text-lumina-muted px-1.5 py-0.5">+{pkg.features.length - 3} more</span>}
+                                    </div>
+
+                                    <div className="flex justify-between items-end border-t border-lumina-highlight/50 pt-3">
+                                        <div>
+                                            <p className="text-[10px] text-lumina-muted uppercase font-bold">Starting At</p>
+                                            <p className="text-xl font-mono font-bold text-emerald-400">Rp {(pkg.price / 1000).toFixed(0)}k</p>
+                                        </div>
+                                        {pkg.taxIncluded && (
+                                            <span className="text-[10px] text-lumina-muted bg-emerald-500/10 text-emerald-500 px-2 py-0.5 rounded font-bold">Tax Inc.</span>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 ))}
             </div>
 
