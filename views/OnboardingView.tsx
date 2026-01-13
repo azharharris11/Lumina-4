@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, OnboardingData } from '../types';
-import { Aperture, ArrowRight, Camera, Briefcase, Building, Zap, Check, Loader2, User as UserIcon, Clock, DollarSign, Tag, ArrowLeft, MapPin, Phone, Plus, Trash2, Percent } from 'lucide-react';
+import { Aperture, ArrowRight, Camera, Briefcase, Building, Zap, Check, Loader2, User as UserIcon, Clock, DollarSign, Tag, ArrowLeft, MapPin, Phone, Plus, Trash2, Percent, AlertCircle, RefreshCw } from 'lucide-react';
 
 const Motion = motion as any;
 
 interface OnboardingViewProps {
   user: User;
-  onComplete: (data: OnboardingData) => void;
+  onComplete: (data: OnboardingData) => Promise<void>;
 }
 
 const OnboardingView: React.FC<OnboardingViewProps> = ({ user, onComplete }) => {
@@ -32,6 +32,8 @@ const OnboardingView: React.FC<OnboardingViewProps> = ({ user, onComplete }) => 
   // Loading State
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingText, setLoadingText] = useState('Initializing Core System...');
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
       if(step === 1) setStudioName(user.name ? `${user.name.split(' ')[0]}'s Studio` : 'My Studio');
@@ -55,24 +57,14 @@ const OnboardingView: React.FC<OnboardingViewProps> = ({ user, onComplete }) => 
               "Finalizing Workspace..."
           ];
           
+          setError(null);
+          setLoadingProgress(0);
+          
           let i = 0;
           const interval = setInterval(() => {
               setLoadingProgress(prev => {
                   if (prev >= 100) {
                       clearInterval(interval);
-                      setTimeout(() => {
-                          onComplete({
-                              studioName,
-                              address,
-                              phone,
-                              focus,
-                              operatingHours: opHours,
-                              rooms,
-                              bankDetails: bank,
-                              taxRate,
-                              initialPackage: pkg
-                          });
-                      }, 500);
                       return 100;
                   }
                   return prev + (Math.random() * 10);
@@ -87,6 +79,41 @@ const OnboardingView: React.FC<OnboardingViewProps> = ({ user, onComplete }) => 
           return () => clearInterval(interval);
       }
   }, [step]);
+
+  useEffect(() => {
+      if (step === 6 && loadingProgress >= 100 && !isSubmitting && !error) {
+          const finishSetup = async () => {
+              setIsSubmitting(true);
+              try {
+                  await onComplete({
+                      studioName,
+                      address,
+                      phone,
+                      focus,
+                      operatingHours: opHours,
+                      rooms,
+                      bankDetails: bank,
+                      taxRate,
+                      initialPackage: pkg
+                  });
+              } catch (err: any) {
+                  console.error("Onboarding Error:", err);
+                  setError(err.message || "Failed to complete setup. Please check your connection.");
+                  setIsSubmitting(false);
+              }
+          };
+          // Small delay to let the bar hit 100 visual
+          const timer = setTimeout(finishSetup, 500);
+          return () => clearTimeout(timer);
+      }
+  }, [step, loadingProgress, isSubmitting, error, studioName, address, phone, focus, opHours, rooms, bank, taxRate, pkg, onComplete]);
+
+  const retrySetup = () => {
+      setError(null);
+      setLoadingProgress(0);
+      setIsSubmitting(false);
+      // The step 6 useEffect will restart the process
+  };
 
   const addRoom = () => {
       if(newRoom.trim()) {
@@ -402,7 +429,8 @@ const OnboardingView: React.FC<OnboardingViewProps> = ({ user, onComplete }) => 
                             <button onClick={() => setStep(4)} className="text-lumina-muted hover:text-white text-sm font-bold flex items-center gap-2"><ArrowLeft size={16}/> Back</button>
                             <button 
                                 onClick={() => setStep(6)}
-                                className="flex items-center gap-2 bg-white text-black px-8 py-3 rounded-xl font-bold hover:bg-lumina-accent transition-colors"
+                                disabled={!pkg.name || pkg.price <= 0}
+                                className="flex items-center gap-2 bg-white text-black px-8 py-3 rounded-xl font-bold hover:bg-lumina-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Finish Setup <Zap size={18} fill="black" />
                             </button>
@@ -422,21 +450,41 @@ const OnboardingView: React.FC<OnboardingViewProps> = ({ user, onComplete }) => 
                             <svg className="w-full h-full" viewBox="0 0 100 100">
                                 <circle cx="50" cy="50" r="45" fill="none" stroke="#333" strokeWidth="8" />
                                 <Motion.circle 
-                                    cx="50" cy="50" r="45" fill="none" stroke="#bef264" strokeWidth="8" strokeLinecap="round"
+                                    cx="50" cy="50" r="45" fill="none" 
+                                    stroke={error ? "#f43f5e" : "#bef264"}
+                                    strokeWidth="8" strokeLinecap="round"
                                     initial={{ pathLength: 0 }}
                                     animate={{ pathLength: loadingProgress / 100 }}
                                     transform="rotate(-90 50 50)"
                                 />
                             </svg>
                             <div className="absolute inset-0 flex items-center justify-center font-mono font-bold text-white">
-                                {Math.round(loadingProgress)}%
+                                {error ? <AlertCircle className="text-rose-500" /> : `${Math.round(loadingProgress)}%`}
                             </div>
                         </div>
 
                         <div>
-                            <h2 className="text-2xl font-bold text-white mb-2">Setting up {studioName}</h2>
-                            <p className="text-lumina-accent font-mono text-sm animate-pulse">{loadingText}</p>
+                            <h2 className="text-2xl font-bold text-white mb-2">
+                                {error ? "Setup Failed" : `Setting up ${studioName}`}
+                            </h2>
+                            <p className={`${error ? "text-rose-400" : "text-lumina-accent animate-pulse"} font-mono text-sm`}>
+                                {error || loadingText}
+                            </p>
                         </div>
+
+                        {error && (
+                            <Motion.div 
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                            >
+                                <button 
+                                    onClick={retrySetup}
+                                    className="flex items-center gap-2 mx-auto bg-white text-black px-6 py-2 rounded-xl font-bold hover:bg-lumina-accent transition-colors"
+                                >
+                                    <RefreshCw size={16} /> Retry Setup
+                                </button>
+                            </Motion.div>
+                        )}
                     </Motion.div>
                 )}
 
