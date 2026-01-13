@@ -67,10 +67,18 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
               const text = await res.text();
               console.error("Drive API Error:", text);
               
+              let detailedMsg = "";
+              try {
+                  const json = JSON.parse(text);
+                  detailedMsg = json.error?.message || text;
+              } catch {
+                  detailedMsg = text;
+              }
+
               if (res.status === 403) {
-                  setErrorMsg("Access Denied (403). Ensure you have permission. If you just reconnected, try refreshing the page.");
+                  setErrorMsg(`Access Denied (403): ${detailedMsg}`);
               } else {
-                  setErrorMsg(`Error ${res.status}: ${text}`);
+                  setErrorMsg(`Error ${res.status}: ${detailedMsg}`);
               }
               return;
           }
