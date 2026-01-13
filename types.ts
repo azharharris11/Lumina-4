@@ -400,6 +400,11 @@ export interface OnboardingData {
   bankDetails: { name: string; number: string; holder: string };
   taxRate: number;
   initialPackage: { name: string; price: number; duration: number };
+  
+  // New Personalization Fields
+  businessType: 'FREELANCE' | 'STUDIO' | 'AGENCY';
+  teamSize: 'SOLO' | 'SMALL' | 'LARGE';
+  visualTheme: 'MODERN' | 'CLASSIC' | 'PLAYFUL';
 }
 
 export interface PaymentChannel {
@@ -417,6 +422,17 @@ export interface StudioConfig {
   phone: string;
   website: string;
   
+  // Personalization Config
+  businessType?: 'FREELANCE' | 'STUDIO' | 'AGENCY';
+  teamSize?: 'SOLO' | 'SMALL' | 'LARGE';
+  visualTheme?: 'MODERN' | 'CLASSIC' | 'PLAYFUL';
+  featureFlags?: {
+      enableInventory: boolean;
+      enableTeam: boolean;
+      enableProduction: boolean;
+      enableRooms: boolean;
+  };
+
   taxRate: number;
   bankName: string; // Deprecated: Use paymentChannels
   bankAccount: string; // Deprecated
@@ -467,6 +483,7 @@ export interface SidebarProps {
   bookings?: Booking[];
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  config?: StudioConfig;
 }
 
 export interface DashboardProps {

@@ -37,6 +37,35 @@
         --accent: 77 124 15;   /* #4d7c0f (Lime 700) */
       }
 
+      /* --- VISUAL THEMES --- */
+      
+      /* CLASSIC THEME (Serif + Monochrome/Gold) */
+      body[data-theme='CLASSIC'] {
+        --font-heading: 'Playfair Display', serif;
+        /* Keep outfit for readability on body */
+        --accent: 212 175 55; /* #D4AF37 (Gold) */
+      }
+      body[data-theme='CLASSIC'].light-mode {
+         --accent: 180 83 9; /* Darker Gold/Bronze for light mode readability */
+      }
+      body[data-theme='CLASSIC'] .text-glow {
+        text-shadow: none; /* Cleaner look */
+      }
+
+      /* PLAYFUL THEME (Rounded + Pop Colors) */
+      body[data-theme='PLAYFUL'] {
+        --font-heading: 'Outfit', sans-serif; /* Rounder sans */
+        --accent: 244 114 182; /* #f472b6 (Pink 400) */
+      }
+      body[data-theme='PLAYFUL'].light-mode {
+        --accent: 219 39 119; /* #db2777 (Pink 600) */
+      }
+      body[data-theme='PLAYFUL'] .rounded-xl,
+      body[data-theme='PLAYFUL'] .rounded-2xl,
+      body[data-theme='PLAYFUL'] .rounded-lg {
+        border-radius: 1.5rem; /* Extra rounded */
+      }
+
       body {
         font-family: var(--font-body);
         background-color: rgb(var(--base));

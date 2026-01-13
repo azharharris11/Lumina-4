@@ -22,6 +22,8 @@ const GeneralTab: React.FC<GeneralTabProps> = ({ config, setConfig, onSave, onUp
     const [isUploadingQR, setIsUploadingQR] = useState(false);
     const [isUploadingPortalBg, setIsUploadingPortalBg] = useState(false);
 
+    const isFreelance = config?.businessType === 'FREELANCE';
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setConfig({ ...config, [name]: value });
@@ -38,7 +40,8 @@ const GeneralTab: React.FC<GeneralTabProps> = ({ config, setConfig, onSave, onUp
     };
 
     const handleDeleteRoom = (id: string, name: string) => {
-        if (!window.confirm(`Delete studio room '${name}'?`)) return;
+        const msg = isFreelance ? `Delete location '${name}'?` : `Delete studio room '${name}'?`;
+        if (!window.confirm(msg)) return;
         const updatedConfig = { ...config, rooms: (config.rooms || []).filter(r => r.id !== id) };
         setConfig(updatedConfig);
         onUpdateConfig(updatedConfig);
@@ -153,16 +156,18 @@ const GeneralTab: React.FC<GeneralTabProps> = ({ config, setConfig, onSave, onUp
             
             {/* Basic Info */}
             <div className="space-y-4">
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider border-b border-lumina-highlight pb-2">Studio Identity</h3>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider border-b border-lumina-highlight pb-2">
+                    {isFreelance ? 'Business Identity' : 'Studio Identity'}
+                </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div><label className="block text-xs text-lumina-muted mb-1 font-bold">Studio Name</label><input name="name" value={config.name} onChange={handleChange} className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-3 text-white"/></div>
+                    <div><label className="block text-xs text-lumina-muted mb-1 font-bold">{isFreelance ? 'Business Name' : 'Studio Name'}</label><input name="name" value={config.name} onChange={handleChange} className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-3 text-white"/></div>
                     <div><label className="block text-xs text-lumina-muted mb-1 font-bold">Address</label><input name="address" value={config.address} onChange={handleChange} className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-3 text-white"/></div>
                     <div><label className="block text-xs text-lumina-muted mb-1 font-bold">Phone</label><input name="phone" value={config.phone} onChange={handleChange} className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-3 text-white"/></div>
                     <div><label className="block text-xs text-lumina-muted mb-1 font-bold">Website</label><input name="website" value={config.website} onChange={handleChange} className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-3 text-white"/></div>
                     
                     {/* Logo Upload Section */}
                     <div>
-                        <label className="block text-xs text-lumina-muted mb-1 font-bold">Studio Logo</label>
+                        <label className="block text-xs text-lumina-muted mb-1 font-bold">{isFreelance ? 'Business Logo' : 'Studio Logo'}</label>
                         <div className="flex items-center gap-4 p-3 border border-lumina-highlight rounded-lg bg-lumina-base h-[74px]">
                             <div className="w-12 h-12 bg-lumina-surface rounded flex items-center justify-center overflow-hidden border border-lumina-highlight shrink-0">
                                 {config.logoUrl ? (
@@ -292,7 +297,7 @@ const GeneralTab: React.FC<GeneralTabProps> = ({ config, setConfig, onSave, onUp
                             onChange={e => setNewPaymentChannel({...newPaymentChannel, type: e.target.value as any})}
                         >
                             <option value="BANK">Bank Account</option>
-                            <option value="E_WALLET">E-Wallet</option>
+                            <option value="E_Wallet">E-Wallet</option>
                             <option value="QRIS">QRIS</option>
                         </select>
                         <input 
@@ -368,7 +373,7 @@ const GeneralTab: React.FC<GeneralTabProps> = ({ config, setConfig, onSave, onUp
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {[ 
                         { title: 'Expense Types', list: 'expenseCategories', val: newExpenseCat, set: setNewExpenseCat },
-                        { title: 'Asset Types', list: 'assetCategories', val: newAssetCat, set: setNewAssetCat },
+                        { title: isFreelance ? 'Gear Types' : 'Asset Types', list: 'assetCategories', val: newAssetCat, set: setNewAssetCat },
                         { title: 'Client Tags', list: 'clientCategories', val: newClientCat, set: setNewClientCat }
                     ].map((grp) => (
                         <div key={grp.list} className="bg-lumina-base border border-lumina-highlight rounded-xl p-4">
@@ -401,9 +406,11 @@ const GeneralTab: React.FC<GeneralTabProps> = ({ config, setConfig, onSave, onUp
 
             {/* Rooms */}
             <div className="space-y-4">
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider border-b border-lumina-highlight pb-2">Studio Rooms</h3>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider border-b border-lumina-highlight pb-2">
+                    {isFreelance ? 'Locations' : 'Studio Rooms'}
+                </h3>
                 <div className="space-y-3 mb-4">
-                    {config.rooms.map(room => (
+                    {(config.rooms || []).map(room => (
                         <div key={room.id} className="flex justify-between items-center bg-lumina-base p-3 rounded-lg border border-lumina-highlight">
                             <div className="flex items-center gap-3">
                                 <div className={`w-4 h-4 rounded-full bg-${room.color}-500`}></div>
@@ -415,7 +422,12 @@ const GeneralTab: React.FC<GeneralTabProps> = ({ config, setConfig, onSave, onUp
                     ))}
                 </div>
                 <div className="flex gap-2">
-                    <input placeholder="New Room Name" value={newRoom.name} onChange={e => setNewRoom({...newRoom, name: e.target.value})} className="flex-1 bg-lumina-base border border-lumina-highlight rounded-lg p-2 text-white text-sm"/>
+                    <input 
+                        placeholder={isFreelance ? "New Location Name" : "New Room Name"} 
+                        value={newRoom.name} 
+                        onChange={e => setNewRoom({...newRoom, name: e.target.value})} 
+                        className="flex-1 bg-lumina-base border border-lumina-highlight rounded-lg p-2 text-white text-sm"
+                    />
                     <button onClick={handleAddRoom} className="bg-lumina-accent text-lumina-base px-4 rounded-lg font-bold text-sm">Add</button>
                 </div>
             </div>

@@ -161,7 +161,7 @@ const ClientsView: React.FC<ClientsViewProps> = ({ clients, bookings, onUpdateCl
                     </div>
                     <h3 className="text-2xl font-bold text-white mb-2">No clients yet</h3>
                     <p className="text-lumina-muted max-w-xs mx-auto mb-8">
-                        Start building your studio database by adding your first client today.
+                        {config?.businessType === 'FREELANCE' ? 'Start building your business database by adding your first client today.' : 'Start building your studio database by adding your first client today.'}
                     </p>
                     <button 
                         onClick={() => setIsAddModalOpen(true)}

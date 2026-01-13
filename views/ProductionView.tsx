@@ -12,14 +12,14 @@ interface ProductionViewProps {
   config: StudioConfig; 
 }
 
-const ProductionView: React.FC<ProductionViewProps> = ({ bookings, onSelectBooking, currentUser, onUpdateBooking }) => {
+const ProductionView: React.FC<ProductionViewProps> = ({ bookings, onSelectBooking, currentUser, onUpdateBooking, config }) => {
   const [filterMode, setFilterMode] = useState<'ALL' | 'MINE'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [draggedBookingId, setDraggedBookingId] = useState<string | null>(null);
   const [activeDropColumn, setActiveDropColumn] = useState<ProjectStatus | null>(null);
 
   const columns: { id: ProjectStatus; label: string; color: string }[] = [
-    { id: 'SHOOTING', label: 'To Shoot', color: 'indigo' },
+    { id: 'SHOOTING', label: config?.businessType === 'FREELANCE' ? 'Upcoming Shoots' : 'To Shoot', color: 'indigo' },
     { id: 'CULLING', label: 'Culling', color: 'purple' },
     { id: 'EDITING', label: 'Editing', color: 'pink' },
     { id: 'REVIEW', label: 'Review', color: 'amber' },
@@ -68,8 +68,12 @@ const ProductionView: React.FC<ProductionViewProps> = ({ bookings, onSelectBooki
     <div className="h-full flex flex-col">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 shrink-0">
         <div>
-          <h1 className="text-4xl font-display font-bold text-white mb-2 text-glow">Production Board</h1>
-          <p className="text-lumina-muted">Track post-production workflow.</p>
+          <h1 className="text-4xl font-display font-bold text-white mb-2 text-glow">
+              {config?.businessType === 'FREELANCE' ? 'Project Board' : 'Production Board'}
+          </h1>
+          <p className="text-lumina-muted">
+              {config?.businessType === 'FREELANCE' ? 'Track your active projects.' : 'Track post-production workflow.'}
+          </p>
         </div>
         
         <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">

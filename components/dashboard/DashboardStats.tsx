@@ -37,13 +37,22 @@ interface DashboardStatsProps {
     revenueThisMonth: number;
     pendingEditsCount: number;
     utilizationRate: number;
+    businessType?: 'FREELANCE' | 'STUDIO' | 'AGENCY';
+    hoursBooked?: number;
 }
 
-const DashboardStats: React.FC<DashboardStatsProps> = ({ todayBookingsCount, revenueThisMonth, pendingEditsCount, utilizationRate }) => {
+const DashboardStats: React.FC<DashboardStatsProps> = ({ 
+    todayBookingsCount, 
+    revenueThisMonth, 
+    pendingEditsCount, 
+    utilizationRate,
+    businessType = 'STUDIO',
+    hoursBooked = 0
+}) => {
     return (
         <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
             <StatCard 
-            title="Sessions Today" 
+            title={businessType === 'FREELANCE' ? "Shoots Today" : "Sessions Today"}
             value={todayBookingsCount.toString()} 
             icon={Users} 
             trend={todayBookingsCount > 0 ? "+1" : "0"} 
@@ -62,12 +71,22 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ todayBookingsCount, rev
             trend={pendingEditsCount > 5 ? "Busy" : "Normal"} 
             trendDown={pendingEditsCount > 5}
             />
-            <StatCard 
-            title="Studio Util." 
-            value={`${utilizationRate}%`} 
-            icon={Clock} 
-            trend="Capacity" 
-            />
+            
+            {businessType === 'FREELANCE' ? (
+                <StatCard 
+                title="Hours Booked" 
+                value={`${hoursBooked}h`} 
+                icon={Clock} 
+                trend="Today" 
+                />
+            ) : (
+                <StatCard 
+                title="Studio Util." 
+                value={`${utilizationRate}%`} 
+                icon={Clock} 
+                trend="Capacity" 
+                />
+            )}
         </div>
     );
 };

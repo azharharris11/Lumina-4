@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, OnboardingData } from '../types';
-import { Aperture, ArrowRight, Camera, Briefcase, Building, Zap, Check, Loader2, User as UserIcon, Clock, DollarSign, Tag, ArrowLeft, MapPin, Phone, Plus, Trash2, Percent, AlertCircle, RefreshCw } from 'lucide-react';
+import { Aperture, ArrowRight, Camera, Briefcase, Building, Zap, Check, Loader2, User as UserIcon, Clock, DollarSign, Tag, ArrowLeft, MapPin, Phone, Plus, Trash2, Percent, AlertCircle, RefreshCw, Users, Palette, Monitor, Home } from 'lucide-react';
 
 const Motion = motion as any;
 
@@ -11,13 +11,18 @@ interface OnboardingViewProps {
 }
 
 const OnboardingView: React.FC<OnboardingViewProps> = ({ user, onComplete }) => {
-  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5 | 6>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9>(1);
   
   // Form State
   const [studioName, setStudioName] = useState('');
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
   
+  // Personalization State
+  const [businessType, setBusinessType] = useState<'FREELANCE' | 'STUDIO' | 'AGENCY'>('STUDIO');
+  const [teamSize, setTeamSize] = useState<'SOLO' | 'SMALL' | 'LARGE'>('SOLO');
+  const [visualTheme, setVisualTheme] = useState<'MODERN' | 'CLASSIC' | 'PLAYFUL'>('MODERN');
+
   const [focus, setFocus] = useState('');
   
   const [opHours, setOpHours] = useState({ start: '09:00', end: '18:00' });
@@ -47,13 +52,14 @@ const OnboardingView: React.FC<OnboardingViewProps> = ({ user, onComplete }) => 
       if (focus === 'RENTAL') setPkg({ name: 'Studio Rental (Hourly)', price: 300000, duration: 1 });
   }, [focus]);
 
+  // Loader Effect
   useEffect(() => {
-      if (step === 6) {
+      if (step === 9) {
           const texts = [
-              "Configuring Financial Ledger...",
-              "Setting up Production Pipeline...",
-              "Calibrating Color Profiles...",
-              "Syncing Calendar Engine...",
+              "Configuring Business Logic...",
+              "Optimizing Interface...",
+              "Setting up Financial Ledger...",
+              "Calibrating Production Pipeline...",
               "Finalizing Workspace..."
           ];
           
@@ -80,8 +86,9 @@ const OnboardingView: React.FC<OnboardingViewProps> = ({ user, onComplete }) => 
       }
   }, [step]);
 
+  // Submission Effect
   useEffect(() => {
-      if (step === 6 && loadingProgress >= 100 && !isSubmitting && !error) {
+      if (step === 9 && loadingProgress >= 100 && !isSubmitting && !error) {
           const finishSetup = async () => {
               setIsSubmitting(true);
               try {
@@ -91,10 +98,13 @@ const OnboardingView: React.FC<OnboardingViewProps> = ({ user, onComplete }) => 
                       phone,
                       focus,
                       operatingHours: opHours,
-                      rooms,
+                      rooms: businessType === 'FREELANCE' ? [] : rooms, // No rooms for freelancers
                       bankDetails: bank,
                       taxRate,
-                      initialPackage: pkg
+                      initialPackage: pkg,
+                      businessType,
+                      teamSize,
+                      visualTheme
                   });
               } catch (err: any) {
                   console.error("Onboarding Error:", err);
@@ -102,17 +112,15 @@ const OnboardingView: React.FC<OnboardingViewProps> = ({ user, onComplete }) => 
                   setIsSubmitting(false);
               }
           };
-          // Small delay to let the bar hit 100 visual
           const timer = setTimeout(finishSetup, 500);
           return () => clearTimeout(timer);
       }
-  }, [step, loadingProgress, isSubmitting, error, studioName, address, phone, focus, opHours, rooms, bank, taxRate, pkg, onComplete]);
+  }, [step, loadingProgress, isSubmitting, error, onComplete]);
 
   const retrySetup = () => {
       setError(null);
       setLoadingProgress(0);
       setIsSubmitting(false);
-      // The step 6 useEffect will restart the process
   };
 
   const addRoom = () => {
@@ -131,6 +139,24 @@ const OnboardingView: React.FC<OnboardingViewProps> = ({ user, onComplete }) => 
       { id: 'COMMERCIAL', label: 'Commercial / Ads', icon: Briefcase, desc: 'B2B, invoicing focused' },
       { id: 'PORTRAIT', label: 'Portrait & Family', icon: UserIcon, desc: 'Studio sessions, recurring clients' },
       { id: 'RENTAL', label: 'Studio Rental', icon: Building, desc: 'Booking slots, asset tracking' }
+  ];
+
+  const businessTypeOptions = [
+      { id: 'FREELANCE', label: 'Freelancer / On-Location', icon: Camera, desc: 'Portable gear, no physical studio to manage.' },
+      { id: 'STUDIO', label: 'Physical Studio', icon: Home, desc: 'Manage rooms, rentals, and on-site shoots.' },
+      { id: 'AGENCY', label: 'Agency / Production House', icon: Building, desc: 'Complex projects, multiple teams, payroll.' }
+  ];
+
+  const teamSizeOptions = [
+      { id: 'SOLO', label: 'Just Me (Solo)', icon: UserIcon, desc: 'I wear all the hats.' },
+      { id: 'SMALL', label: 'Small Team (2-5)', icon: Users, desc: 'Me + Assistants or Partners.' },
+      { id: 'LARGE', label: 'Large Team (6+)', icon: Briefcase, desc: 'Admins, Editors, Photographers.' }
+  ];
+
+  const themeOptions = [
+      { id: 'MODERN', label: 'Modern Dark', icon: Monitor, desc: 'Sleek, high contrast, professional.', color: 'bg-zinc-900' },
+      { id: 'CLASSIC', label: 'Classic Light', icon: Palette, desc: 'Clean, airy, traditional.', color: 'bg-gray-100' },
+      { id: 'PLAYFUL', label: 'Playful', icon: Zap, desc: 'Vibrant, friendly, approachable.', color: 'bg-indigo-900' }
   ];
 
   return (
@@ -156,7 +182,7 @@ const OnboardingView: React.FC<OnboardingViewProps> = ({ user, onComplete }) => 
                 <Aperture className="w-8 h-8 text-lumina-accent animate-spin-slow" />
             </Motion.div>
             
-            {step < 6 && (
+            {step < 9 && (
                 <Motion.h1 className="text-3xl md:text-5xl font-display font-bold text-white mb-2">
                     Welcome to Lumina
                 </Motion.h1>
@@ -230,10 +256,156 @@ const OnboardingView: React.FC<OnboardingViewProps> = ({ user, onComplete }) => 
                     </Motion.div>
                 )}
 
-                {/* STEP 2: FOCUS */}
+                {/* STEP 2: BUSINESS MODEL */}
                 {step === 2 && (
                     <Motion.div 
                         key="step2"
+                        initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }}
+                        className="space-y-6"
+                    >
+                        <div className="text-center mb-6">
+                            <h2 className="text-xl font-bold text-white">How do you operate?</h2>
+                            <p className="text-lumina-muted text-sm">We'll tailor the features to your workflow.</p>
+                        </div>
+
+                        <div className="space-y-3">
+                            {businessTypeOptions.map(opt => (
+                                <button
+                                    key={opt.id}
+                                    onClick={() => setBusinessType(opt.id as any)}
+                                    className={`w-full p-4 rounded-xl border text-left transition-all flex items-center gap-4
+                                        ${businessType === opt.id 
+                                            ? 'bg-lumina-accent text-black border-lumina-accent' 
+                                            : 'bg-lumina-base border-lumina-highlight text-lumina-muted hover:border-white hover:text-white'}
+                                    `}
+                                >
+                                    <div className={`p-2 rounded-full ${businessType === opt.id ? 'bg-black/10' : 'bg-lumina-surface'}`}>
+                                        <opt.icon size={20} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-sm uppercase tracking-wider">{opt.label}</h3>
+                                        <p className={`text-xs ${businessType === opt.id ? 'text-black/70' : 'text-lumina-muted'}`}>
+                                            {opt.desc}
+                                        </p>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="flex justify-center mt-8 gap-4">
+                            <button onClick={() => setStep(1)} className="text-lumina-muted hover:text-white text-sm font-bold flex items-center gap-2"><ArrowLeft size={16}/> Back</button>
+                            <button 
+                                onClick={() => setStep(3)}
+                                className="flex items-center gap-2 bg-white text-black px-8 py-3 rounded-xl font-bold hover:bg-lumina-accent transition-colors"
+                            >
+                                Next Step <ArrowRight size={18} />
+                            </button>
+                        </div>
+                    </Motion.div>
+                )}
+
+                {/* STEP 3: TEAM SIZE */}
+                {step === 3 && (
+                    <Motion.div 
+                        key="step3"
+                        initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }}
+                        className="space-y-6"
+                    >
+                        <div className="text-center mb-6">
+                            <h2 className="text-xl font-bold text-white">Who is on your team?</h2>
+                            <p className="text-lumina-muted text-sm">We'll set up permissions accordingly.</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {teamSizeOptions.map(opt => (
+                                <button
+                                    key={opt.id}
+                                    onClick={() => setTeamSize(opt.id as any)}
+                                    className={`p-4 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-3 h-40
+                                        ${teamSize === opt.id 
+                                            ? 'bg-lumina-accent text-black border-lumina-accent' 
+                                            : 'bg-lumina-base border-lumina-highlight text-lumina-muted hover:border-white hover:text-white'}
+                                    `}
+                                >
+                                    <opt.icon size={32} />
+                                    <div>
+                                        <h3 className="font-bold text-sm uppercase tracking-wider mb-1">{opt.label}</h3>
+                                        <p className={`text-[10px] ${teamSize === opt.id ? 'text-black/70' : 'text-lumina-muted'}`}>
+                                            {opt.desc}
+                                        </p>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="flex justify-center mt-8 gap-4">
+                            <button onClick={() => setStep(2)} className="text-lumina-muted hover:text-white text-sm font-bold flex items-center gap-2"><ArrowLeft size={16}/> Back</button>
+                            <button 
+                                onClick={() => setStep(4)}
+                                className="flex items-center gap-2 bg-white text-black px-8 py-3 rounded-xl font-bold hover:bg-lumina-accent transition-colors"
+                            >
+                                Next Step <ArrowRight size={18} />
+                            </button>
+                        </div>
+                    </Motion.div>
+                )}
+
+                {/* STEP 4: VISUAL THEME */}
+                {step === 4 && (
+                    <Motion.div 
+                        key="step4"
+                        initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }}
+                        className="space-y-6"
+                    >
+                        <div className="text-center mb-6">
+                            <h2 className="text-xl font-bold text-white">Pick your vibe</h2>
+                            <p className="text-lumina-muted text-sm">Choose the look of your dashboard.</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {themeOptions.map(opt => (
+                                <button
+                                    key={opt.id}
+                                    onClick={() => setVisualTheme(opt.id as any)}
+                                    className={`relative overflow-hidden p-4 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-3 h-48 group
+                                        ${visualTheme === opt.id 
+                                            ? 'border-lumina-accent ring-2 ring-lumina-accent ring-offset-2 ring-offset-black' 
+                                            : 'border-lumina-highlight hover:border-white'}
+                                    `}
+                                >
+                                    <div className={`absolute inset-0 opacity-20 ${opt.color}`}></div>
+                                    <div className="relative z-10">
+                                        <opt.icon size={32} className={visualTheme === opt.id ? 'text-lumina-accent' : 'text-white'} />
+                                    </div>
+                                    <div className="relative z-10">
+                                        <h3 className="font-bold text-sm uppercase tracking-wider mb-1 text-white">{opt.label}</h3>
+                                        <p className="text-[10px] text-lumina-muted">{opt.desc}</p>
+                                    </div>
+                                    {visualTheme === opt.id && (
+                                        <div className="absolute top-2 right-2 bg-lumina-accent text-black rounded-full p-1">
+                                            <Check size={12} />
+                                        </div>
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="flex justify-center mt-8 gap-4">
+                            <button onClick={() => setStep(3)} className="text-lumina-muted hover:text-white text-sm font-bold flex items-center gap-2"><ArrowLeft size={16}/> Back</button>
+                            <button 
+                                onClick={() => setStep(5)}
+                                className="flex items-center gap-2 bg-white text-black px-8 py-3 rounded-xl font-bold hover:bg-lumina-accent transition-colors"
+                            >
+                                Next Step <ArrowRight size={18} />
+                            </button>
+                        </div>
+                    </Motion.div>
+                )}
+
+                {/* STEP 5: FOCUS */}
+                {step === 5 && (
+                    <Motion.div 
+                        key="step5"
                         initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }}
                         className="space-y-6"
                     >
@@ -263,9 +435,9 @@ const OnboardingView: React.FC<OnboardingViewProps> = ({ user, onComplete }) => 
                         </div>
 
                         <div className="flex justify-center mt-8 gap-4">
-                            <button onClick={() => setStep(1)} className="text-lumina-muted hover:text-white text-sm font-bold flex items-center gap-2"><ArrowLeft size={16}/> Back</button>
+                            <button onClick={() => setStep(4)} className="text-lumina-muted hover:text-white text-sm font-bold flex items-center gap-2"><ArrowLeft size={16}/> Back</button>
                             <button 
-                                onClick={() => setStep(3)}
+                                onClick={() => setStep(6)}
                                 disabled={!focus}
                                 className="flex items-center gap-2 bg-white text-black px-8 py-3 rounded-xl font-bold hover:bg-lumina-accent transition-colors disabled:opacity-50"
                             >
@@ -275,16 +447,16 @@ const OnboardingView: React.FC<OnboardingViewProps> = ({ user, onComplete }) => 
                     </Motion.div>
                 )}
 
-                {/* STEP 3: OPERATIONS */}
-                {step === 3 && (
+                {/* STEP 6: OPERATIONS */}
+                {step === 6 && (
                     <Motion.div 
-                        key="step3"
+                        key="step6"
                         initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }}
                         className="space-y-6"
                     >
                         <div className="text-center mb-6">
                             <h2 className="text-xl font-bold text-white">Operations</h2>
-                            <p className="text-lumina-muted text-sm">Define your working hours and spaces.</p>
+                            <p className="text-lumina-muted text-sm">Define your working hours{businessType !== 'FREELANCE' ? ' and spaces' : ''}.</p>
                         </div>
 
                         <div className="space-y-6">
@@ -302,34 +474,36 @@ const OnboardingView: React.FC<OnboardingViewProps> = ({ user, onComplete }) => 
                                 </div>
                             </div>
 
-                            <div className="p-4 bg-lumina-base border border-lumina-highlight rounded-xl">
-                                <h3 className="text-white font-bold flex items-center gap-2 mb-4 text-sm uppercase tracking-wider"><Building size={16} className="text-blue-400"/> Studio Rooms</h3>
-                                <div className="space-y-2 mb-3">
-                                    {rooms.map((room, i) => (
-                                        <div key={i} className="flex justify-between items-center bg-lumina-surface p-2 rounded border border-lumina-highlight">
-                                            <span className="text-sm text-white">{room}</span>
-                                            <button onClick={() => removeRoom(i)} className="text-lumina-muted hover:text-rose-500"><Trash2 size={14}/></button>
-                                        </div>
-                                    ))}
+                            {businessType !== 'FREELANCE' && (
+                                <div className="p-4 bg-lumina-base border border-lumina-highlight rounded-xl">
+                                    <h3 className="text-white font-bold flex items-center gap-2 mb-4 text-sm uppercase tracking-wider"><Building size={16} className="text-blue-400"/> Studio Rooms</h3>
+                                    <div className="space-y-2 mb-3">
+                                        {rooms.map((room, i) => (
+                                            <div key={i} className="flex justify-between items-center bg-lumina-surface p-2 rounded border border-lumina-highlight">
+                                                <span className="text-sm text-white">{room}</span>
+                                                <button onClick={() => removeRoom(i)} className="text-lumina-muted hover:text-rose-500"><Trash2 size={14}/></button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input 
+                                            placeholder="Add Room (e.g. Outdoor)" 
+                                            value={newRoom} 
+                                            onChange={e => setNewRoom(e.target.value)}
+                                            onKeyDown={e => e.key === 'Enter' && addRoom()}
+                                            className="flex-1 bg-lumina-surface border border-lumina-highlight rounded p-2 text-white text-sm focus:border-blue-400 outline-none"
+                                        />
+                                        <button onClick={addRoom} className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded"><Plus size={16}/></button>
+                                    </div>
                                 </div>
-                                <div className="flex gap-2">
-                                    <input 
-                                        placeholder="Add Room (e.g. Outdoor)" 
-                                        value={newRoom} 
-                                        onChange={e => setNewRoom(e.target.value)}
-                                        onKeyDown={e => e.key === 'Enter' && addRoom()}
-                                        className="flex-1 bg-lumina-surface border border-lumina-highlight rounded p-2 text-white text-sm focus:border-blue-400 outline-none"
-                                    />
-                                    <button onClick={addRoom} className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded"><Plus size={16}/></button>
-                                </div>
-                            </div>
+                            )}
                         </div>
 
                         <div className="flex justify-center mt-8 gap-4">
-                            <button onClick={() => setStep(2)} className="text-lumina-muted hover:text-white text-sm font-bold flex items-center gap-2"><ArrowLeft size={16}/> Back</button>
+                            <button onClick={() => setStep(5)} className="text-lumina-muted hover:text-white text-sm font-bold flex items-center gap-2"><ArrowLeft size={16}/> Back</button>
                             <button 
-                                onClick={() => setStep(4)}
-                                disabled={rooms.length === 0}
+                                onClick={() => setStep(7)}
+                                disabled={businessType !== 'FREELANCE' && rooms.length === 0}
                                 className="flex items-center gap-2 bg-white text-black px-8 py-3 rounded-xl font-bold hover:bg-lumina-accent transition-colors disabled:opacity-50"
                             >
                                 Next Step <ArrowRight size={18} />
@@ -338,10 +512,10 @@ const OnboardingView: React.FC<OnboardingViewProps> = ({ user, onComplete }) => 
                     </Motion.div>
                 )}
 
-                {/* STEP 4: FINANCE */}
-                {step === 4 && (
+                {/* STEP 7: FINANCE */}
+                {step === 7 && (
                     <Motion.div 
-                        key="step4"
+                        key="step7"
                         initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }}
                         className="space-y-6"
                     >
@@ -377,9 +551,9 @@ const OnboardingView: React.FC<OnboardingViewProps> = ({ user, onComplete }) => 
                         </div>
 
                         <div className="flex justify-center mt-8 gap-4">
-                            <button onClick={() => setStep(3)} className="text-lumina-muted hover:text-white text-sm font-bold flex items-center gap-2"><ArrowLeft size={16}/> Back</button>
+                            <button onClick={() => setStep(6)} className="text-lumina-muted hover:text-white text-sm font-bold flex items-center gap-2"><ArrowLeft size={16}/> Back</button>
                             <button 
-                                onClick={() => setStep(5)}
+                                onClick={() => setStep(8)}
                                 disabled={!bank.name || !bank.number}
                                 className="flex items-center gap-2 bg-white text-black px-8 py-3 rounded-xl font-bold hover:bg-lumina-accent transition-colors disabled:opacity-50"
                             >
@@ -389,10 +563,10 @@ const OnboardingView: React.FC<OnboardingViewProps> = ({ user, onComplete }) => 
                     </Motion.div>
                 )}
 
-                {/* STEP 5: FIRST PACKAGE */}
-                {step === 5 && (
+                {/* STEP 8: FIRST PACKAGE */}
+                {step === 8 && (
                     <Motion.div 
-                        key="step5"
+                        key="step8"
                         initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }}
                         className="space-y-6"
                     >
@@ -426,9 +600,9 @@ const OnboardingView: React.FC<OnboardingViewProps> = ({ user, onComplete }) => 
                         </div>
 
                         <div className="flex justify-center mt-8 gap-4">
-                            <button onClick={() => setStep(4)} className="text-lumina-muted hover:text-white text-sm font-bold flex items-center gap-2"><ArrowLeft size={16}/> Back</button>
+                            <button onClick={() => setStep(7)} className="text-lumina-muted hover:text-white text-sm font-bold flex items-center gap-2"><ArrowLeft size={16}/> Back</button>
                             <button 
-                                onClick={() => setStep(6)}
+                                onClick={() => setStep(9)}
                                 disabled={!pkg.name || pkg.price <= 0}
                                 className="flex items-center gap-2 bg-white text-black px-8 py-3 rounded-xl font-bold hover:bg-lumina-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
@@ -438,10 +612,10 @@ const OnboardingView: React.FC<OnboardingViewProps> = ({ user, onComplete }) => 
                     </Motion.div>
                 )}
 
-                {/* STEP 6: LOADER */}
-                {step === 6 && (
+                {/* STEP 9: LOADER */}
+                {step === 9 && (
                     <Motion.div 
-                        key="step6"
+                        key="step9"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         className="text-center space-y-8"

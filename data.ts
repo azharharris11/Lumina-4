@@ -7,6 +7,17 @@ export const STUDIO_CONFIG: StudioConfig = {
   address: 'Jl. Senopati No. 45, Kebayoran Baru, Jakarta Selatan',
   phone: '+62 812 9988 7766',
   website: 'www.luminastudios.id',
+
+  // Personalization Defaults
+  businessType: 'STUDIO',
+  teamSize: 'SMALL',
+  visualTheme: 'MODERN',
+  featureFlags: {
+      enableInventory: true,
+      enableTeam: true,
+      enableProduction: true,
+      enableRooms: true
+  },
   
   // Financial Defaults
   taxRate: 11, 

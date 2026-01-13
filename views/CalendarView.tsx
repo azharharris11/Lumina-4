@@ -113,9 +113,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ bookings, currentDate, user
       {/* Responsive Header */}
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-6 gap-4">
         <div>
-          <h1 className="text-3xl md:text-4xl font-display font-bold text-white mb-1 md:mb-2">Studio Schedule</h1>
+          <h1 className="text-3xl md:text-4xl font-display font-bold text-white mb-1 md:mb-2">
+              {config?.businessType === 'FREELANCE' ? 'Shoot Schedule' : 'Studio Schedule'}
+          </h1>
           <p className="text-lumina-muted">
-              {viewMode === 'LIST' && `Upcoming Bookings`}
+              {viewMode === 'LIST' && (config?.businessType === 'FREELANCE' ? `Upcoming Shoots` : `Upcoming Bookings`)}
               {viewMode === 'MONTH' && new Date(currentDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
               {viewMode === 'WEEK' && `Week of ${new Date(getStartOfWeek(currentDate)).toLocaleDateString()}`}
               {viewMode === 'DAY' && new Date(currentDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
@@ -153,7 +155,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ bookings, currentDate, user
             className="bg-lumina-accent text-lumina-base px-3 md:px-4 py-2 rounded-lg font-bold flex items-center hover:bg-lumina-accent/90 ml-auto xl:ml-0"
           >
               <Plus size={18} className="mr-2" />
-              <span className="hidden md:inline">NEW BOOKING</span>
+              <span className="hidden md:inline">
+                  {config?.businessType === 'FREELANCE' ? 'NEW SHOOT' : 'NEW BOOKING'}
+              </span>
               <span className="md:hidden">NEW</span>
           </button>
         </div>

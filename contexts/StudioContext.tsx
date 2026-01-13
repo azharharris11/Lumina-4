@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import {
   StudioConfig, Booking, Asset, Client, Account, Package, Transaction, Notification,
-  OnboardingData, MonthlyMetric, BookingTask, ProjectStatus
+  OnboardingData, MonthlyMetric, BookingTask, ProjectStatus, WorkflowAutomation
 } from '../types';
+import { INDUSTRY_TEMPLATES } from '../utils/industryTemplates';
 import { STUDIO_CONFIG } from '../data';
 import { db, functions } from '../firebase';
 import {
@@ -552,7 +553,6 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       const userRef = doc(db, "users", ownerId);
       
-      // Fix: Use set with merge instead of update to handle missing documents
       const userPayload = {
           uid: currentUser.id,
           name: currentUser.name,
@@ -573,13 +573,85 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const accRef = doc(db, "accounts", accId);
       batch.set(accRef, newAccount);
 
-      const pkgId = `p-${Date.now()}`;
-      const newPackage: Package = { id: pkgId, name: data.initialPackage.name, price: data.initialPackage.price, duration: data.initialPackage.duration, features: ['Includes studio rental', 'Basic editing', 'Digital delivery'], active: true, costBreakdown: [], turnaroundDays: 7, ownerId };
-      const pkgRef = doc(db, "packages", pkgId);
-      batch.set(pkgRef, newPackage);
+      // Industry Templates Logic
+      const template = INDUSTRY_TEMPLATES[data.focus] || INDUSTRY_TEMPLATES.PORTRAIT;
+      
+      // Create Packages from Template + Initial User Package
+      const initialPkg: Package = { 
+          id: `p-init-${Date.now()}`, 
+          name: data.initialPackage.name, 
+          price: data.initialPackage.price, 
+          duration: data.initialPackage.duration, 
+          features: ['Primary Service', 'Standard Editing', 'Digital Delivery'], 
+          active: true, 
+          costBreakdown: [], 
+          turnaroundDays: 7, 
+          ownerId 
+      };
+      batch.set(doc(db, "packages", initialPkg.id), initialPkg);
 
-      const roomObjects = data.rooms.map((roomName, index) => ({ id: `r-${index + 1}`, name: roomName, type: 'INDOOR' as const, color: index === 0 ? 'indigo' : index === 1 ? 'purple' : 'emerald' }));
-      const newConfig: StudioConfig = { ...STUDIO_CONFIG, name: data.studioName, address: data.address, phone: data.phone, taxRate: data.taxRate, ownerId, bankName: data.bankDetails.name, bankAccount: data.bankDetails.number, bankHolder: data.bankDetails.holder, operatingHoursStart: data.operatingHours.start, operatingHoursEnd: data.operatingHours.end, rooms: roomObjects.length > 0 ? roomObjects : [{ id: 'r1', name: 'Main Studio', type: 'INDOOR', color: 'indigo' }] };
+      template.packages.forEach((tp, idx) => {
+          // Avoid duplicate name if user already created one similar
+          if (tp.name === initialPkg.name) return;
+          
+          const pkgId = `p-temp-${Date.now()}-${idx}`;
+          const newPkg: Package = {
+              id: pkgId,
+              name: tp.name!,
+              price: tp.price!,
+              duration: tp.duration!,
+              features: tp.features || [],
+              active: true,
+              turnaroundDays: tp.turnaroundDays || 7,
+              ownerId,
+              costBreakdown: []
+          };
+          batch.set(doc(db, "packages", pkgId), newPkg);
+      });
+
+      let roomObjects: import('../types').StudioRoom[] = data.rooms.map((roomName, index) => ({ id: `r-${index + 1}`, name: roomName, type: 'INDOOR', color: index === 0 ? 'indigo' : index === 1 ? 'purple' : 'emerald' }));
+      
+      if (roomObjects.length === 0 && data.businessType === 'FREELANCE') {
+          roomObjects = [{ id: 'r1', name: 'On Location', type: 'OUTDOOR', color: 'emerald' }];
+      } else if (roomObjects.length === 0) {
+          roomObjects = [{ id: 'r1', name: 'Main Studio', type: 'INDOOR', color: 'indigo' }];
+      }
+
+      const featureFlags = {
+          enableInventory: true,
+          enableTeam: data.teamSize !== 'SOLO',
+          enableProduction: data.businessType !== 'FREELANCE',
+          enableRooms: data.businessType === 'STUDIO'
+      };
+
+      // Automations from Template
+      const automations: WorkflowAutomation[] = template.automations.map((a, idx) => ({
+          id: `auto-${Date.now()}-${idx}`,
+          triggerStatus: a.triggerStatus!,
+          tasks: a.tasks || []
+      }));
+
+      const newConfig: StudioConfig = { 
+          ...STUDIO_CONFIG, 
+          name: data.studioName, 
+          address: data.address, 
+          phone: data.phone, 
+          taxRate: data.taxRate, 
+          ownerId, 
+          bankName: data.bankDetails.name, 
+          bankAccount: data.bankDetails.number, 
+          bankHolder: data.bankDetails.holder, 
+          operatingHoursStart: data.operatingHours.start, 
+          operatingHoursEnd: data.operatingHours.end, 
+          rooms: roomObjects,
+          businessType: data.businessType,
+          teamSize: data.teamSize,
+          visualTheme: data.visualTheme,
+          featureFlags: featureFlags,
+          workflowAutomations: automations,
+          contractTerms: template.contractSnippet
+      };
+      
       const configRef = doc(db, "studios", ownerId);
       batch.set(configRef, newConfig);
 

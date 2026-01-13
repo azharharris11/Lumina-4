@@ -68,8 +68,24 @@ const App: React.FC = () => {
       addUser, updateUser, deleteUser,
       addAccount, updateAccount, deleteAccount,
       completeOnboarding,
+      addNotification,
       dismissNotification 
   } = useStudio();
+
+  // --- GROW WITH YOU LOGIC ---
+  useEffect(() => {
+      if (config?.teamSize === 'SOLO' && clients.length >= 5 && !config.featureFlags?.enableTeam) {
+          const hasNotified = sessionStorage.getItem('lumina_growth_notified');
+          if (!hasNotified) {
+              addNotification({
+                  type: 'SUCCESS',
+                  title: 'Growth Alert! 🚀',
+                  message: 'Your client base is growing! You might want to enable Team Management in Settings.',
+              });
+              sessionStorage.setItem('lumina_growth_notified', 'true');
+          }
+      }
+  }, [clients.length, config?.teamSize, config?.featureFlags?.enableTeam]);
 
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [currentView, setCurrentView] = useState('dashboard');
@@ -90,12 +106,30 @@ const App: React.FC = () => {
   });
   
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [hasRedirected, setHasRedirected] = useState(false);
   
   // Public Site Logic
   const [portalBooking, setPortalBooking] = useState<Booking | null>(null);
   const [publicConfig, setPublicConfig] = useState<any>(null);
   const [isPublicLoading, setIsPublicLoading] = useState(false);
   const [publicError, setPublicError] = useState<string | null>(null);
+
+  // --- THEME ENGINE ---
+  useEffect(() => {
+      if (config?.visualTheme) {
+          document.body.setAttribute('data-theme', config.visualTheme);
+      } else {
+          document.body.removeAttribute('data-theme');
+      }
+  }, [config?.visualTheme]);
+
+  // --- SMART MOBILE ROUTING ---
+  useEffect(() => {
+      if (!loadingData && currentUser && isMobile && config?.businessType === 'FREELANCE' && currentView === 'dashboard' && !hasRedirected) {
+          setCurrentView('calendar');
+          setHasRedirected(true);
+      }
+  }, [currentUser, isMobile, config?.businessType, currentView, loadingData, hasRedirected]);
 
   // Fetch Google Token if User is Connected
   useEffect(() => {
@@ -321,6 +355,7 @@ const App: React.FC = () => {
         // These props need to be added to SidebarProps type if not there
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        config={config}
       />
       
       <main className={`flex-1 flex flex-col h-screen relative overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>

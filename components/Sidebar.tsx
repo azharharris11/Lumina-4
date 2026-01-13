@@ -26,22 +26,76 @@ const Motion = motion as any;
 const Sidebar: React.FC<SidebarProps> = ({ 
   currentUser, onNavigate, currentView, onLogout, onSwitchApp, 
   isDarkMode, onToggleTheme, bookings,
-  isCollapsed = false, onToggleCollapse
+  isCollapsed = false, onToggleCollapse, config
 }) => {
 
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['OWNER', 'ADMIN', 'PHOTOGRAPHER', 'EDITOR', 'FINANCE'] },
-    { id: 'calendar', label: 'Schedule', icon: CalendarDays, roles: ['OWNER', 'ADMIN', 'PHOTOGRAPHER'] },
-    { id: 'production', label: 'Production', icon: Layers, roles: ['OWNER', 'ADMIN', 'EDITOR', 'PHOTOGRAPHER'] },
-    { id: 'inventory', label: 'Inventory', icon: Box, roles: ['OWNER', 'ADMIN', 'PHOTOGRAPHER'] },
-    { id: 'clients', label: 'Clients', icon: Users, roles: ['OWNER', 'ADMIN', 'FINANCE'] },
-    { id: 'team', label: 'Team & HR', icon: Briefcase, roles: ['OWNER', 'ADMIN', 'FINANCE'] },
-    { id: 'finance', label: 'Finance', icon: Wallet, roles: ['OWNER', 'FINANCE'] },
-    { id: 'analytics', label: 'Analytics', icon: BarChart2, roles: ['OWNER', 'ADMIN'] },
-    { id: 'settings', label: 'Settings', icon: Settings, roles: ['OWNER', 'ADMIN'] },
+    { 
+        id: 'dashboard', 
+        label: 'Dashboard', 
+        icon: LayoutDashboard, 
+        roles: ['OWNER', 'ADMIN', 'PHOTOGRAPHER', 'EDITOR', 'FINANCE'] 
+    },
+    { 
+        id: 'calendar', 
+        label: 'Schedule', 
+        icon: CalendarDays, 
+        roles: ['OWNER', 'ADMIN', 'PHOTOGRAPHER'] 
+    },
+    { 
+        id: 'production', 
+        label: config?.businessType === 'FREELANCE' ? 'Projects' : 'Production', 
+        icon: Layers, 
+        roles: ['OWNER', 'ADMIN', 'EDITOR', 'PHOTOGRAPHER'],
+        visible: config?.featureFlags?.enableProduction ?? true
+    },
+    { 
+        id: 'inventory', 
+        label: config?.businessType === 'FREELANCE' ? 'Gear' : 'Inventory', 
+        icon: Box, 
+        roles: ['OWNER', 'ADMIN', 'PHOTOGRAPHER'],
+        visible: config?.featureFlags?.enableInventory ?? true
+    },
+    { 
+        id: 'clients', 
+        label: 'Clients', 
+        icon: Users, 
+        roles: ['OWNER', 'ADMIN', 'FINANCE'] 
+    },
+    { 
+        id: 'team', 
+        label: 'Team & HR', 
+        icon: Briefcase, 
+        roles: ['OWNER', 'ADMIN', 'FINANCE'],
+        visible: config?.featureFlags?.enableTeam ?? true
+    },
+    { 
+        id: 'finance', 
+        label: 'Finance', 
+        icon: Wallet, 
+        roles: ['OWNER', 'FINANCE'] 
+    },
+    { 
+        id: 'analytics', 
+        label: 'Analytics', 
+        icon: BarChart2, 
+        roles: ['OWNER', 'ADMIN'] 
+    },
+    { 
+        id: 'settings', 
+        label: 'Settings', 
+        icon: Settings, 
+        roles: ['OWNER', 'ADMIN'] 
+    },
   ];
 
-  const filteredMenu = menuItems.filter(item => item.roles.includes(currentUser.role));
+  const filteredMenu = menuItems.filter(item => {
+      // Role Check
+      if (!item.roles.includes(currentUser.role)) return false;
+      // Feature Flag Check
+      if (item.visible === false) return false;
+      return true;
+  });
 
   // Calculate Badges
   const getBadgeCount = (viewId: string) => {

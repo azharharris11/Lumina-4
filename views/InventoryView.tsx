@@ -125,8 +125,12 @@ const InventoryView: React.FC<InventoryViewProps> = ({ assets, users, onAddAsset
     <div className="space-y-8 h-full flex flex-col" onClick={() => setActiveMenu(null)}>
       <div className="flex flex-col md:flex-row justify-between items-end shrink-0">
         <div>
-          <h1 className="text-4xl font-display font-bold text-white mb-2">Inventory Management</h1>
-          <p className="text-lumina-muted">Track equipment location, status, and maintenance schedules.</p>
+          <h1 className="text-4xl font-display font-bold text-white mb-2">
+              {config?.businessType === 'FREELANCE' ? 'Gear Management' : 'Inventory Management'}
+          </h1>
+          <p className="text-lumina-muted">
+              {config?.businessType === 'FREELANCE' ? 'Track your gear availability, status, and maintenance.' : 'Track equipment location, status, and maintenance schedules.'}
+          </p>
         </div>
         <div className="flex gap-3 mt-4 md:mt-0">
             <div className="relative group">

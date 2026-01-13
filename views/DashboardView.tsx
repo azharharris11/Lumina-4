@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Camera, CheckSquare } from 'lucide-react';
@@ -6,6 +5,7 @@ import { DashboardProps } from '../types';
 import DashboardStats from '../components/dashboard/DashboardStats';
 import DashboardSchedule from '../components/dashboard/DashboardSchedule';
 import DashboardActionItems from '../components/dashboard/DashboardActionItems';
+import NextShootHero from '../components/dashboard/NextShootHero';
 
 const Motion = motion as any;
 
@@ -118,6 +118,15 @@ const DashboardView: React.FC<DashboardProps> = ({ user, bookings, transactions 
         </div>
       </div>
 
+      {/* FREELANCER HERO (If not currently shooting) */}
+      {config?.businessType === 'FREELANCE' && !activeShoot && (
+          <NextShootHero 
+              bookings={bookings} 
+              onSelectBooking={onSelectBooking} 
+              onOpenWhatsApp={onOpenWhatsApp} 
+          />
+      )}
+
       {/* ON-SET MODE CARD (Photographers Only) */}
       {activeShoot && (
           <Motion.div variants={itemVariants} className="bg-gradient-to-r from-blue-900/40 to-indigo-900/40 border border-blue-500/30 rounded-2xl p-6 relative overflow-hidden">
@@ -144,6 +153,8 @@ const DashboardView: React.FC<DashboardProps> = ({ user, bookings, transactions 
           revenueThisMonth={revenueThisMonth}
           pendingEditsCount={pendingEdits.length}
           utilizationRate={utilizationRate}
+          businessType={config?.businessType}
+          hoursBooked={hoursBookedToday}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

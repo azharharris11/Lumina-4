@@ -80,7 +80,9 @@ const FinanceView: React.FC<FinanceViewProps> = ({ accounts, metrics, bookings, 
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end shrink-0 gap-4">
         <div>
           <h1 className="text-3xl lg:text-4xl font-display font-bold text-white mb-1 lg:mb-2">Financial Hub</h1>
-          <p className="text-lumina-muted text-sm">Master your studio's cash flow.</p>
+          <p className="text-lumina-muted text-sm">
+              {config?.businessType === 'FREELANCE' ? "Master your business's cash flow." : "Master your studio's cash flow."}
+          </p>
         </div>
         <div className="grid grid-cols-2 lg:flex w-full lg:w-auto gap-3">
           <button 
