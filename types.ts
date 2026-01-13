@@ -127,6 +127,7 @@ export interface BookingFile {
     id: string;
     name: string;
     url: string;
+    path?: string; // Relative path for folder structure
     type: 'CONTRACT' | 'INVOICE' | 'RECEIPT' | 'DELIVERABLE';
     uploadedAt: string;
     source?: 'FIREBASE' | 'GOOGLE_DRIVE';
@@ -148,6 +149,17 @@ export interface ProofingItem {
     filename: string;
     selected: boolean;
     feedback?: string;
+}
+
+export interface InternalReview {
+    id: string;
+    bookingId: string;
+    clientName: string;
+    rating: number;
+    feedback: string;
+    timestamp: string;
+    status: 'PENDING' | 'RESOLVED';
+    ownerId?: string;
 }
 
 export interface Booking {
@@ -460,6 +472,8 @@ export interface StudioConfig {
   npwp?: string;
   invoiceFooter?: string;
   contractTerms?: string; // New: Custom Contract Terms
+  googleReviewLink?: string; // For Smart Testimonials
+  googleBusinessName?: string;
   rooms: StudioRoom[];
   templates: WhatsAppTemplates;
   

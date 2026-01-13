@@ -1,32 +1,204 @@
 import {onDocumentCreated, onDocumentUpdated, onDocumentDeleted} from "firebase-functions/v2/firestore";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
+import {onSchedule} from "firebase-functions/v2/scheduler";
 import * as logger from "firebase-functions/logger";
 import {initializeApp} from "firebase-admin/app";
 import {getFirestore} from "firebase-admin/firestore";
-// import * as nodemailer from "nodemailer";
+import * as nodemailer from "nodemailer";
 
 import { getGoogleAuthURL, googleAuthCallback, disconnectGoogle, getGoogleAccessToken, googleClientId, googleClientSecret, googleRedirectUri, getAuthenticatedClient } from "./googleIntegration";
 
 initializeApp();
 const db = getFirestore();
 
-// Export Google Auth Functions
-import { getPortalFiles, proxyDriveDownload, downloadGalleryZip } from "./portalIntegration";
+// Ethereal Email Configuration (For Testing Only)
+const transporter = nodemailer.createTransport({
+    host: 'smtp.ethereal.email',
+    port: 587,
+    auth: {
+        user: 'karelle.brakus@ethereal.email',
+        pass: '6G2QyYq2qQ2qQ2qQ2q' 
+    }
+});
 
-export { getGoogleAuthURL, googleAuthCallback, disconnectGoogle, getGoogleAccessToken, getPortalFiles, proxyDriveDownload, downloadGalleryZip };
+// Export Google Auth Functions
+import { getPortalFiles, proxyDriveDownload, downloadGalleryZip, proxyWatermarkedImage } from "./portalIntegration";
+
+export { getGoogleAuthURL, googleAuthCallback, disconnectGoogle, getGoogleAccessToken, getPortalFiles, proxyDriveDownload, downloadGalleryZip, proxyWatermarkedImage };
 
 // ... (existing imports and code)
 
-// Ethereal Email Configuration (For Testing Only)
-// In production, replace with SendGrid, Mailgun, or Gmail OAuth
-// const transporter = nodemailer.createTransport({
-//     host: 'smtp.ethereal.email',
-//     port: 587,
-//     auth: {
-//         user: 'karelle.brakus@ethereal.email',
-//         pass: '6G2QyYq2qQ2qQ2qQ2q' // Fake password, for demo structure only
-//     }
-// });
+/**
+ * Scheduled Function: Runs on the 1st of every month at 01:00 AM.
+ * Goal: Aggregate financial data for the previous month and store in 'metrics'.
+ */
+export const monthlyFinancialAggregator = onSchedule("0 1 1 * *", async (event) => {
+    const db = getFirestore();
+    const lastMonth = new Date();
+    lastMonth.setMonth(lastMonth.getMonth() - 1);
+    
+    const year = lastMonth.getFullYear();
+    const month = lastMonth.getMonth(); // 0-indexed
+    const monthLabel = lastMonth.toLocaleString('default', { month: 'short' });
+    const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+    logger.info(`Running Monthly Aggregator for ${monthKey}`);
+
+    try {
+        // We need to do this for EACH owner (studio)
+        const studiosSnap = await db.collection("studios").get();
+        
+        for (const studioDoc of studiosSnap.docs) {
+            const ownerId = studioDoc.id;
+            
+            const startOfMonth = new Date(year, month, 1).toISOString();
+            const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
+
+            const transSnap = await db.collection("transactions")
+                .where("ownerId", "==", ownerId)
+                .where("date", ">=", startOfMonth)
+                .where("date", "<=", endOfMonth)
+                .get();
+
+            let revenue = 0;
+            let expenses = 0;
+            let bookingsCount = 0;
+
+            transSnap.forEach(doc => {
+                const t = doc.data();
+                if (t.type === "INCOME") revenue += t.amount;
+                if (t.type === "EXPENSE") expenses += t.amount;
+            });
+
+            const bookingsSnap = await db.collection("bookings")
+                .where("ownerId", "==", ownerId)
+                .where("date", ">=", startOfMonth)
+                .where("date", "<=", endOfMonth)
+                .where("status", "!=", "CANCELLED")
+                .get();
+            
+            bookingsCount = bookingsSnap.size;
+
+            const metric = {
+                id: monthKey,
+                month: monthLabel,
+                revenue,
+                expenses,
+                profit: revenue - expenses,
+                bookings: bookingsCount,
+                updatedAt: new Date().toISOString(),
+                ownerId
+            };
+
+            await db.collection("metrics").doc(`${ownerId}_${monthKey}`).set(metric);
+            logger.info(`Metric saved for studio ${ownerId}: ${monthKey}`);
+        }
+    } catch (error) {
+        logger.error("Monthly Aggregator Failed", error);
+    }
+});
+
+/**
+ * Trigger: Runs when a new Internal Review is created.
+ * Goal: Send emergency email for ratings <= 3.
+ */
+export const onNegativeFeedback = onDocumentCreated("internal_reviews/{reviewId}", async (event) => {
+    const review = event.data?.data();
+    if (!review || review.rating > 3) return;
+
+    const db = getFirestore();
+    try {
+        const ownerSnap = await db.collection("users").doc(review.ownerId).get();
+        const ownerEmail = ownerSnap.data()?.email;
+
+        if (ownerEmail) {
+            const subject = `[URGENT] Negative Feedback from ${review.clientName}`;
+            const html = `
+                <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 2px solid #f43f5e; border-radius: 10px;">
+                    <h2 style="color: #f43f5e;">Alert: Low Rating Received</h2>
+                    <p>Your client <strong>${review.clientName}</strong> has just submitted a <strong>${review.rating}-star</strong> review.</p>
+                    <div style="background: #fff1f2; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f43f5e;">
+                        <p style="margin: 0;"><strong>Client Feedback:</strong></p>
+                        <p style="font-style: italic; margin-top: 5px;">"${review.feedback || "No comment provided."}"</p>
+                    </div>
+                    <p>We recommend reaching out to the client immediately to resolve any issues before they post this review publicly.</p>
+                    <a href="https://lumina-studio.web.app/dashboard" style="display: inline-block; background: #f43f5e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Take Action</a>
+                </div>
+            `;
+
+            await transporter.sendMail({
+                from: '"Lumina Emergency" <emergency@lumina.id>',
+                to: ownerEmail,
+                subject: subject,
+                html: html,
+            });
+
+            logger.info(`Emergency feedback email sent to ${ownerEmail}`);
+        }
+    } catch (error) {
+        logger.error("Failed to send emergency feedback email", error);
+    }
+});
+
+export const dailyReminderCron = onSchedule("0 8 * * *", async (event) => {
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+    logger.info(`Running Daily Reminders for ${tomorrowStr}`);
+
+    try {
+        const bookingsRef = db.collection("bookings");
+        const snapshot = await bookingsRef
+            .where("date", "==", tomorrowStr)
+            .where("status", "in", ["BOOKED", "INQUIRY"])
+            .get();
+
+        if (snapshot.empty) {
+            logger.info("No bookings scheduled for tomorrow.");
+            return;
+        }
+
+        for (const doc of snapshot.docs) {
+            const booking = doc.data();
+            
+            // Send Email to Client (Mocking client email as it's not always in booking, 
+            // but in real app we'd fetch it from the 'clients' collection)
+            const clientSnap = await db.collection("clients").doc(booking.clientId).get();
+            const clientEmail = clientSnap.data()?.email;
+
+            if (clientEmail) {
+                const subject = `Reminder: Your Photo Session Tomorrow!`;
+                const html = `
+                    <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                        <h2 style="color: #2563eb;">See you tomorrow!</h2>
+                        <p>Hi ${booking.clientName},</p>
+                        <p>This is a friendly reminder for your scheduled session tomorrow.</p>
+                        <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                            <p style="margin: 0;"><strong>Package:</strong> ${booking.package}</p>
+                            <p style="margin: 5px 0 0 0;"><strong>Time:</strong> ${booking.timeStart}</p>
+                            <p style="margin: 5px 0 0 0;"><strong>Location:</strong> ${booking.studio}</p>
+                        </div>
+                        <p>If you need to reschedule or have any questions, please contact us immediately.</p>
+                        <a href="https://lumina-studio.web.app/portal/${booking.id}" style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Access Client Portal</a>
+                    </div>
+                `;
+
+                await transporter.sendMail({
+                    from: '"Lumina System" <system@lumina.id>',
+                    to: clientEmail,
+                    subject: subject,
+                    html: html,
+                });
+
+                logger.info(`Reminder sent to ${clientEmail} for booking ${doc.id}`);
+            }
+        }
+    } catch (error) {
+        logger.error("Failed to process daily reminders", error);
+    }
+});
 
 export const sendBookingNotification = onDocumentCreated("bookings/{bookingId}", async (event) => {
   const snapshot = event.data;
@@ -42,37 +214,40 @@ export const sendBookingNotification = onDocumentCreated("bookings/{bookingId}",
 
   try {
     // 1. Get Owner Email (to notify the studio owner)
-    // In a real app, you'd fetch the user profile:
-    // const userDoc = await db.collection('users').doc(booking.ownerId).get();
-    // const ownerEmail = userDoc.data()?.email;
+    const userDoc = await db.collection('users').doc(booking.ownerId).get();
+    const ownerEmail = userDoc.data()?.email;
 
-    // For prototype, we'll just log that we would send it
+    if (!ownerEmail) {
+        logger.warn(`No email found for owner ${booking.ownerId}. Skipping notification.`);
+        return;
+    }
+
     const subject = `New Booking: ${booking.clientName} - ${booking.package}`;
     const html = `
-            <h3>New Booking Received!</h3>
-            <p><strong>Client:</strong> ${booking.clientName}</p>
-            <p><strong>Package:</strong> ${booking.package}</p>
-            <p><strong>Date:</strong> ${booking.date} @ ${booking.timeStart}</p>
-            <p><strong>Studio:</strong> ${booking.studio}</p>
-            <br/>
-            <a href="https://lumina-studio.web.app/dashboard">View in Dashboard</a>
+            <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                <h2 style="color: #2563eb;">New Booking Received!</h2>
+                <p>Hi there,</p>
+                <p>You have a new booking from <strong>${booking.clientName}</strong>.</p>
+                <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                    <p style="margin: 0;"><strong>Package:</strong> ${booking.package}</p>
+                    <p style="margin: 5px 0 0 0;"><strong>Date:</strong> ${booking.date} @ ${booking.timeStart}</p>
+                    <p style="margin: 5px 0 0 0;"><strong>Studio:</strong> ${booking.studio}</p>
+                </div>
+                <a href="https://lumina-studio.web.app/dashboard" style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">View in Dashboard</a>
+                <p style="font-size: 12px; color: #777; margin-top: 30px;">This is an automated notification from Lumina.</p>
+            </div>
         `;
 
-    // Send Email (Simulated)
-    // const info = await transporter.sendMail({
-    //     from: '"Lumina System" <system@lumina.id>',
-    //     to: "owner@example.com", // Replace with ownerEmail
-    //     subject: subject,
-    //     html: html,
-    // });
+    // Send Email
+    await transporter.sendMail({
+        from: '"Lumina System" <system@lumina.id>',
+        to: ownerEmail,
+        subject: subject,
+        html: html,
+    });
 
-    logger.info(`[MOCK EMAIL] Subject: ${subject}`);
-    logger.info(`[MOCK EMAIL] Body: ${html}`);
+    logger.info(`Email notification sent to ${ownerEmail} for booking ${bookingId}`);
 
-    logger.info(`Email notification processed for booking ${bookingId}`);
-
-    // Optional: Update the booking doc to say notification sent
-    // await snapshot.ref.update({ notificationSent: true });
   } catch (error) {
     logger.error("Failed to send notification email", error);
   }
@@ -238,6 +413,11 @@ export const createBooking = onCall({
                 description: `Client Phone: ${newBooking.clientPhone}\nPackage: ${newBooking.package}\nNotes: ${newBooking.notes || "-"}`,
                 start: {dateTime: startTime.toISOString()},
                 end: {dateTime: endTime.toISOString()},
+                extendedProperties: {
+                  private: {
+                    bookingId: newBooking.id,
+                  },
+                },
               },
             });
 
@@ -498,6 +678,11 @@ export const onBookingUpdated = onDocumentUpdated({
           end: { dateTime: endTime.toISOString() },
           summary: `Lumina: ${after.clientName} - ${after.package} (Updated)`,
           description: `[UPDATED] Client Phone: ${after.clientPhone}\nPackage: ${after.package}\nNotes: ${after.notes || "-"}`,
+          extendedProperties: {
+            private: {
+              bookingId: event.params.bookingId,
+            },
+          },
         },
       });
       logger.info(`Google Calendar Event ${googleEventId} updated.`);

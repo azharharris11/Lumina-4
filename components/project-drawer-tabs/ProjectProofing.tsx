@@ -248,8 +248,19 @@ const ProjectProofing: React.FC<ProjectProofingProps> = ({ booking, googleToken,
                                     </div>
                                 )}
 
-                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-2">
+                                {liveProofingData.find(p => p.id === file.id)?.feedback && (
+                                    <div className="absolute top-2 left-2 bg-blue-600 text-white p-1 rounded-full shadow-sm z-10" title={liveProofingData.find(p => p.id === file.id)?.feedback}>
+                                        <RefreshCcw size={10} className="rotate-45"/>
+                                    </div>
+                                )}
+
+                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-2">
                                     <p className="text-[10px] text-white font-mono truncate w-full text-center">{file.name}</p>
+                                    {liveProofingData.find(p => p.id === file.id)?.feedback && (
+                                        <div className="bg-blue-500/20 border border-blue-500/30 p-2 rounded text-[9px] text-blue-200 w-full mb-1">
+                                            "{(liveProofingData.find(p => p.id === file.id)?.feedback || '').substring(0, 50)}..."
+                                        </div>
+                                    )}
                                     <a href={file.webViewLink} target="_blank" className="p-1.5 bg-white text-black rounded-full hover:scale-110 transition-transform" title="View in Drive">
                                         <ExternalLink size={12}/>
                                     </a>

@@ -45,6 +45,13 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
     const [proofingData, setProofingData] = useState<ProofingItem[]>(booking.proofingData || []);
     const [isSubmittingSelection, setIsSubmittingSelection] = useState(false);
 
+    // Feedback States
+    const [rating, setRating] = useState(0);
+    const [hoverRating, setHoverRating] = useState(0);
+    const [feedbackText, setFeedbackText] = useState('');
+    const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+    const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+
     useEffect(() => {
         if (booking.proofingData) {
             setProofingData(booking.proofingData);
@@ -90,7 +97,7 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
         return proofingData.find(p => p.id === fileId)?.selected || false;
     };
 
-    const handleToggleHeart = async (id: string, fileData?: { name: string, thumbnail: string }) => {
+    const handleToggleHeart = async (id: string, fileData?: { name: string, thumbnail: string }, feedback?: string) => {
         if (booking.selectionSubmitted) return;
         
         // Check if item exists in proofingData
@@ -98,15 +105,20 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
         let newData = [...proofingData];
 
         if (existingIndex >= 0) {
-            // Toggle
-            newData[existingIndex] = { ...newData[existingIndex], selected: !newData[existingIndex].selected };
+            // Toggle selection or update feedback
+            if (feedback !== undefined) {
+                newData[existingIndex] = { ...newData[existingIndex], feedback: feedback };
+            } else {
+                newData[existingIndex] = { ...newData[existingIndex], selected: !newData[existingIndex].selected };
+            }
         } else if (fileData) {
             // Add if missing (only possible from Gallery tab)
             newData.push({
                 id: id,
                 filename: fileData.name,
                 thumbnail: fileData.thumbnail,
-                selected: true
+                selected: feedback !== undefined ? false : true,
+                feedback: feedback || ''
             });
         }
         
@@ -122,12 +134,11 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
         }
     };
 
-    const handleDownloadAll = () => {
+    const handleDownloadAll = (part: number = 1) => {
         if (!isPaid) return;
         // Hardcoded base URL for prototype - in production use env var or derived from window.location
-        // Assuming standard Firebase region
         const projectId = "lumina-f7d88"; 
-        const url = `https://us-central1-${projectId}.cloudfunctions.net/downloadGalleryZip?bookingId=${booking.id}`;
+        const url = `https://us-central1-${projectId}.cloudfunctions.net/downloadGalleryZip?bookingId=${booking.id}&part=${part}&size=50`;
         window.open(url, '_blank');
     };
 
@@ -222,22 +233,45 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
         }
     };
 
-    const handleSubmitSelection = async () => {
-        const count = proofingData.filter(i => i.selected).length;
-        if (!confirm(`Are you sure you want to finalize your selection of ${count} photos? You won't be able to change this later.`)) return;
+    const handleSubmitFeedback = async () => {
+        if (rating === 0) return;
 
-        setIsSubmittingSelection(true);
+        setIsSubmittingFeedback(true);
         try {
-            await updateDoc(doc(db, "bookings", booking.id), {
-                selectionSubmitted: true
+            // Store feedback internally regardless of rating (for owner's record)
+            const feedbackId = `rev-${Date.now()}`;
+            await setDoc(doc(db, "internal_reviews", feedbackId), {
+                id: feedbackId,
+                bookingId: booking.id,
+                clientName: booking.clientName,
+                rating: rating,
+                feedback: feedbackText,
+                timestamp: new Date().toISOString(),
+                status: rating <= 3 ? 'PENDING' : 'RESOLVED',
+                ownerId: booking.ownerId
             });
-            // Update local state
-            setBooking(prev => ({ ...prev, selectionSubmitted: true }));
-            alert("Selection submitted successfully! We will proceed with editing.");
+
+            // If rating is high, redirect logic happens in the UI after this
+            setFeedbackSubmitted(true);
+            
+            // If low rating, notify owner via a new notification
+            if (rating <= 3) {
+                 await setDoc(doc(db, "notifications", `n-rev-${Date.now()}`), {
+                    id: `n-rev-${Date.now()}`,
+                    title: "Negative Feedback Received",
+                    message: `${booking.clientName} gave a ${rating}-star review. Please check the feedback tab.`,
+                    time: new Date().toISOString(),
+                    read: false,
+                    type: "WARNING",
+                    link: "dashboard",
+                    ownerId: booking.ownerId
+                });
+            }
         } catch (e) {
-            alert("Error submitting selection.");
+            console.error("Feedback Submission Error:", e);
+            alert("Failed to submit feedback. Please try again.");
         } finally {
-            setIsSubmittingSelection(false);
+            setIsSubmittingFeedback(false);
         }
     };
 
@@ -288,6 +322,20 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
     const bgImage = config.portalBackgroundUrl ? `url(${config.portalBackgroundUrl})` : 'none';
 
     // Helper for hex to rgba
+    const getFileThumbnail = (file: DriveFile) => {
+        if (!file.isImage) return file.thumbnail;
+        
+        // If not paid, use secure backend watermark proxy
+        if (!isPaid) {
+            const projectId = "lumina-f7d88"; // Replace with your project ID
+            const region = "us-central1";
+            return `https://${region}-${projectId}.cloudfunctions.net/proxyWatermarkedImage?fileId=${file.id}&bookingId=${booking.id}&studioName=${encodeURIComponent(config.name)}`;
+        }
+        
+        // If paid, use high-res Google thumbnail
+        return file.thumbnail;
+    };
+
     const hexToRgba = (hex: string, alpha: number) => {
         const r = parseInt(hex.slice(1, 3), 16);
         const g = parseInt(hex.slice(3, 5), 16);
@@ -347,18 +395,32 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
                 <div className="fixed inset-0 z-0 opacity-20 pointer-events-none" style={{ backgroundImage: bgImage, backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
             )}
 
+    // Navigation Tabs Configuration
+    const navTabs = [
+        { id: 'DASHBOARD', icon: LayoutDashboard, label: 'Dashboard' },
+        { id: 'CONTRACT', icon: FileSignature, label: 'Contract' },
+        { id: 'GALLERY', icon: Grid, label: 'Photos' },
+        { id: 'SELECTED', icon: Heart, label: 'Selected', count: selectedPhotos.length }
+    ];
+
+    if (booking.status === 'COMPLETED' || booking.status === 'REVIEW') {
+        navTabs.push({ id: 'FEEDBACK', icon: MessageCircle, label: 'Feedback', count: undefined });
+    }
+
+    return (
+        <div className="min-h-screen text-white font-sans pb-20 relative" style={{ backgroundColor: bgColor }}>
+            {/* Dynamic Background Layer */}
+            {config.portalBackgroundUrl && (
+                <div className="fixed inset-0 z-0 opacity-20 pointer-events-none" style={{ backgroundImage: bgImage, backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
+            )}
+
             {/* Top Bar */}
             <nav className="border-b border-white/10 bg-black/20 backdrop-blur sticky top-0 z-50">
                 <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
                     <span className="font-bold text-lg hidden md:block">{config.name}</span>
                     <div className="flex bg-white/10 p-1 rounded-lg overflow-x-auto no-scrollbar">
                         {/* Nav Buttons with Dynamic Active State */}
-                        {[
-                            { id: 'DASHBOARD', icon: LayoutDashboard, label: 'Dashboard' },
-                            { id: 'CONTRACT', icon: FileSignature, label: 'Contract' },
-                            { id: 'GALLERY', icon: Grid, label: 'Photos' },
-                            { id: 'SELECTED', icon: Heart, label: 'Selected', count: selectedPhotos.length }
-                        ].map(tab => (
+                        {navTabs.map(tab => (
                             <button 
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id as any)}
@@ -367,7 +429,7 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
                                 `}
                                 style={activeTab === tab.id ? { backgroundColor: accentColor } : {}}
                             >
-                                <tab.icon size={14} className={activeTab === tab.id && tab.id === 'SELECTED' ? 'fill-white' : ''} /> 
+                                <tab.icon size={14} className={activeTab === tab.id && (tab.id === 'SELECTED' || tab.id === 'FEEDBACK') ? 'fill-white' : ''} /> 
                                 <span className="hidden sm:inline">{tab.label}</span>
                                 {tab.count !== undefined && <span className="bg-black/20 px-1.5 rounded-full text-[10px] min-w-[16px] text-center">{tab.count}</span>}
                             </button>
@@ -538,14 +600,28 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
                                 </div>
                             )}
 
-                            {/* "Download All" Button */}
+                            {/* "Download All" Button or Parts */}
                             {isPaid && galleryFiles.length > 0 && (
-                                <button 
-                                    onClick={handleDownloadAll}
-                                    className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 rounded-full font-bold transition-transform hover:scale-105 shadow-lg shadow-emerald-900/20"
-                                >
-                                    <Download size={18}/> Download All Photos (.zip)
-                                </button>
+                                <div className="flex flex-wrap justify-center gap-2">
+                                    {galleryFiles.length <= 50 ? (
+                                        <button 
+                                            onClick={() => handleDownloadAll(1)}
+                                            className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 rounded-full font-bold transition-transform hover:scale-105 shadow-lg shadow-emerald-900/20"
+                                        >
+                                            <Download size={18}/> Download All Photos (.zip)
+                                        </button>
+                                    ) : (
+                                        Array.from({ length: Math.ceil(galleryFiles.length / 50) }).map((_, i) => (
+                                            <button 
+                                                key={i}
+                                                onClick={() => handleDownloadAll(i + 1)}
+                                                className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2 rounded-full font-bold text-sm transition-transform hover:scale-105 shadow-lg shadow-emerald-900/20"
+                                            >
+                                                <Download size={16}/> Part {i + 1} ({i * 50 + 1}-{Math.min((i + 1) * 50, galleryFiles.length)})
+                                            </button>
+                                        ))
+                                    )}
+                                </div>
                             )}
                         </div>
 
@@ -569,13 +645,16 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
                                     >
                                         {/* Thumbnail */}
                                         {file.isImage && file.thumbnail ? (
-                                            <img 
-                                                src={file.thumbnail}
-                                                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                                                loading="lazy"
-                                                alt={file.name}
-                                                referrerPolicy="no-referrer"
-                                            />
+                                            <div className="relative w-full h-full">
+                                                <img 
+                                                    src={getFileThumbnail(file)}
+                                                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                                    loading="lazy"
+                                                    alt={file.name}
+                                                    referrerPolicy="no-referrer"
+                                                    onContextMenu={(e) => e.preventDefault()}
+                                                />
+                                            </div>
                                         ) : (
                                             <div className="w-full h-full flex flex-col items-center justify-center text-neutral-600">
                                                 <FileSignature size={32} className="mb-2"/>
@@ -649,11 +728,14 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
 
                                     {/* Main Image */}
                                     <div className="w-full h-full p-4 md:p-10 flex items-center justify-center relative">
-                                        <img 
-                                            src={galleryFiles[lightboxIndex].thumbnail?.replace('=s1600', '=s2048') || galleryFiles[lightboxIndex].thumbnail} 
-                                            className="max-h-full max-w-full object-contain shadow-2xl rounded-sm"
-                                            onClick={e => e.stopPropagation()}
-                                        />
+                                        <div className="relative max-h-full max-w-full">
+                                            <img 
+                                                src={getFileThumbnail(galleryFiles[lightboxIndex])} 
+                                                className="max-h-full max-w-full object-contain shadow-2xl rounded-sm"
+                                                onClick={e => e.stopPropagation()}
+                                                onContextMenu={(e) => e.preventDefault()}
+                                            />
+                                        </div>
                                         
                                         {/* Nav Buttons */}
                                         {lightboxIndex > 0 && (
@@ -675,10 +757,21 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
                                     </div>
                                     
                                     {/* Bottom Toolbar */}
-                                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-4 z-50" onClick={e => e.stopPropagation()}>
+                                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4 z-50 w-full max-w-md px-4" onClick={e => e.stopPropagation()}>
+                                        {!booking.selectionSubmitted && (
+                                            <div className="w-full bg-black/60 backdrop-blur-md border border-white/20 rounded-2xl p-2 flex gap-2 shadow-2xl">
+                                                <input 
+                                                    type="text"
+                                                    placeholder="Add editing notes for this photo..."
+                                                    className="flex-1 bg-transparent border-none text-white text-sm px-4 focus:ring-0 outline-none"
+                                                    value={proofingData.find(p => p.id === galleryFiles[lightboxIndex].id)?.feedback || ''}
+                                                    onChange={(e) => handleToggleHeart(galleryFiles[lightboxIndex].id, { name: galleryFiles[lightboxIndex].name, thumbnail: galleryFiles[lightboxIndex].thumbnail || '' }, e.target.value)}
+                                                />
+                                            </div>
+                                        )}
                                         <button 
                                             onClick={() => handleToggleHeart(galleryFiles[lightboxIndex].id, { name: galleryFiles[lightboxIndex].name, thumbnail: galleryFiles[lightboxIndex].thumbnail || '' })}
-                                            className={`px-6 py-3 rounded-full font-bold flex items-center gap-2 shadow-xl transition-transform hover:scale-105
+                                            className={`px-8 py-3 rounded-full font-bold flex items-center gap-2 shadow-xl transition-transform hover:scale-105
                                                 ${isSelected(galleryFiles[lightboxIndex].id) ? 'bg-rose-500 text-white' : 'bg-white text-black'}
                                             `}
                                         >
@@ -742,6 +835,126 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
                                 ))}
                             </div>
                         )}
+                    </Motion.div>
+                )}
+
+                {/* --- FEEDBACK TAB --- */}
+                {activeTab === 'FEEDBACK' && (
+                    <Motion.div initial={{opacity: 0, scale: 0.98}} animate={{opacity: 1, scale: 1}} className="max-w-2xl mx-auto">
+                        <div className="bg-white/5 border border-white/10 rounded-3xl p-8 md:p-12 text-center">
+                            {!feedbackSubmitted ? (
+                                <>
+                                    <div className="mb-8">
+                                        <div className="w-20 h-20 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                                            <MessageCircle size={40} className="text-white fill-white/10"/>
+                                        </div>
+                                        <h2 className="text-3xl font-bold mb-2">How was your experience?</h2>
+                                        <p className="text-neutral-400">Your feedback helps us improve our service for you and others.</p>
+                                    </div>
+
+                                    {/* Star Rating UI */}
+                                    <div className="flex justify-center gap-3 mb-10">
+                                        {[1, 2, 3, 4, 5].map((star) => (
+                                            <button
+                                                key={star}
+                                                onMouseEnter={() => setHoverRating(star)}
+                                                onMouseLeave={() => setHoverRating(0)}
+                                                onClick={() => setRating(star)}
+                                                className="transition-transform active:scale-90 hover:scale-110"
+                                            >
+                                                <Heart 
+                                                    size={48} 
+                                                    className={`transition-colors ${ (hoverRating || rating) >= star ? 'text-rose-500 fill-rose-500' : 'text-neutral-700'}`}
+                                                />
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <AnimatePresence>
+                                        {rating > 0 && (
+                                            <Motion.div initial={{opacity: 0, y: 10}} animate={{opacity: 1, y: 0}} exit={{opacity: 0}} className="space-y-6">
+                                                <div className="text-left">
+                                                    <label className="block text-xs font-bold text-neutral-500 uppercase mb-2 ml-1">Tell us more (Optional)</label>
+                                                    <textarea 
+                                                        value={feedbackText}
+                                                        onChange={e => setFeedbackText(e.target.value)}
+                                                        placeholder={rating <= 3 ? "How can we make it better?" : "What did you love most about our service?"}
+                                                        className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-white focus:border-white outline-none transition-colors min-h-[120px] resize-none"
+                                                    />
+                                                </div>
+
+                                                <button 
+                                                    onClick={handleSubmitFeedback}
+                                                    disabled={isSubmittingFeedback}
+                                                    className="w-full py-4 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 hover:brightness-110 disabled:opacity-50"
+                                                    style={{ backgroundColor: accentColor }}
+                                                >
+                                                    {isSubmittingFeedback ? (
+                                                        <Loader2 size={20} className="animate-spin"/>
+                                                    ) : (
+                                                        <>Submit Feedback <Send size={18}/></>
+                                                    )}
+                                                </button>
+                                            </Motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </>
+                            ) : (
+                                <Motion.div initial={{opacity: 0, y: 20}} animate={{opacity: 1, y: 0}} className="py-6">
+                                    {rating >= 4 ? (
+                                        <>
+                                            <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6 text-emerald-500">
+                                                <CheckCircle2 size={48}/>
+                                            </div>
+                                            <h2 className="text-3xl font-bold mb-4">Thank You So Much!</h2>
+                                            <p className="text-neutral-400 mb-8 leading-relaxed">
+                                                We are thrilled that you had a great experience with <strong>{config.name}</strong>. 
+                                                Would you mind sharing your review on Google? It helps our small business immensely.
+                                            </p>
+                                            
+                                            <div className="flex flex-col gap-4">
+                                                {config.googleReviewLink ? (
+                                                    <a 
+                                                        href={config.googleReviewLink} 
+                                                        target="_blank" 
+                                                        className="w-full py-4 bg-white text-black font-bold rounded-xl flex items-center justify-center gap-3 hover:bg-gray-200 transition-all shadow-xl"
+                                                    >
+                                                        <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="G"/>
+                                                        Post Review on Google
+                                                    </a>
+                                                ) : (
+                                                     <p className="text-xs text-neutral-500 italic">Google Review link not configured by studio.</p>
+                                                )}
+                                                <button onClick={() => setFeedbackSubmitted(false)} className="text-neutral-500 text-sm hover:text-white transition-colors underline underline-offset-4">
+                                                    Go back
+                                                </button>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="w-20 h-20 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto mb-6 text-rose-500">
+                                                <Heart size={40} className="fill-rose-500/20"/>
+                                            </div>
+                                            <h2 className="text-3xl font-bold mb-4">We Appreciate Your Honesty</h2>
+                                            <p className="text-neutral-400 mb-8 leading-relaxed">
+                                                We are sorry that we didn't meet your expectations. 
+                                                Your feedback has been sent directly to our management team. 
+                                                We will review it and reach out to you if necessary.
+                                            </p>
+                                            <div className="bg-white/5 border border-white/10 p-4 rounded-xl text-sm italic text-neutral-400 mb-8">
+                                                "{feedbackText || "No additional comments provided."}"
+                                            </div>
+                                            <button 
+                                                onClick={() => setActiveTab('DASHBOARD')}
+                                                className="w-full py-4 border border-white/20 text-white font-bold rounded-xl hover:bg-white/10 transition-all"
+                                            >
+                                                Return to Dashboard
+                                            </button>
+                                        </>
+                                    )}
+                                </Motion.div>
+                            )}
+                        </div>
                     </Motion.div>
                 )}
 

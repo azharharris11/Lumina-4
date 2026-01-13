@@ -1,6 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { User } from '../../types';
+import { functions } from '../../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { RefreshCw } from 'lucide-react';
 
 interface TeamTabProps {
     currentUser: User | null;
@@ -12,6 +15,7 @@ interface TeamTabProps {
 
 const TeamTab: React.FC<TeamTabProps> = ({ currentUser, onUpdateProfile, googleToken, onConnectGoogle, onDeleteAccount }) => {
     const [profileForm, setProfileForm] = useState<Partial<User>>({ name: '', phone: '', avatar: '', specialization: '' });
+    const [isSyncing, setIsSyncing] = useState(false);
 
     useEffect(() => {
         if (currentUser) {
@@ -23,6 +27,20 @@ const TeamTab: React.FC<TeamTabProps> = ({ currentUser, onUpdateProfile, googleT
         if (currentUser && profileForm.name) {
             onUpdateProfile({ ...currentUser, ...profileForm } as User);
             alert("Profile updated successfully!");
+        }
+    };
+
+    const handleSyncCalendar = async () => {
+        setIsSyncing(true);
+        try {
+            const registerFn = httpsCallable(functions, 'registerCalendarWebhook');
+            await registerFn();
+            alert("Two-Way Sync activated! Changes from Google Calendar will now push to Lumina.");
+        } catch (e: any) {
+            console.error(e);
+            alert("Failed to activate sync: " + e.message);
+        } finally {
+            setIsSyncing(false);
         }
     };
 
@@ -55,9 +73,20 @@ const TeamTab: React.FC<TeamTabProps> = ({ currentUser, onUpdateProfile, googleT
                                 <p className="text-xs text-lumina-muted">{googleToken ? 'Connected' : 'Not connected'}</p>
                             </div>
                         </div>
-                        <button onClick={onConnectGoogle} className={`px-4 py-2 rounded-lg font-bold text-sm ${googleToken ? 'bg-rose-500/20 text-rose-400 border border-rose-500/50' : 'bg-blue-600 text-white'}`}>
-                            {googleToken ? 'Disconnect' : 'Connect'}
-                        </button>
+                        <div className="flex gap-2">
+                            {googleToken && (
+                                <button 
+                                    onClick={handleSyncCalendar} 
+                                    disabled={isSyncing}
+                                    className="px-4 py-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 rounded-lg font-bold text-sm hover:bg-emerald-500/30 flex items-center gap-2"
+                                >
+                                    <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} /> Sync Now
+                                </button>
+                            )}
+                            <button onClick={onConnectGoogle} className={`px-4 py-2 rounded-lg font-bold text-sm ${googleToken ? 'bg-rose-500/20 text-rose-400 border border-rose-500/50' : 'bg-blue-600 text-white'}`}>
+                                {googleToken ? 'Disconnect' : 'Connect'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

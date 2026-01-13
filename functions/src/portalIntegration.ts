@@ -1,10 +1,182 @@
 
 import { onCall, HttpsError, onRequest } from "firebase-functions/v2/https";
+import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import * as logger from "firebase-functions/logger";
 import { getFirestore } from "firebase-admin/firestore";
 import { google } from "googleapis";
 import archiver from "archiver";
+import * as nodemailer from "nodemailer";
+import sharp from "sharp";
 import { getAuthenticatedClient, googleClientId, googleClientSecret, googleRedirectUri } from "./googleIntegration";
+
+// Ethereal Email Configuration (For Testing Only)
+// In production, replace with SendGrid, Mailgun, or your actual SMTP provider
+const transporter = nodemailer.createTransport({
+    host: 'smtp.ethereal.email',
+    port: 587,
+    auth: {
+        user: 'karelle.brakus@ethereal.email',
+        pass: '6G2QyYq2qQ2qQ2qQ2q' 
+    }
+});
+
+/**
+ * Proxy Function to stream Google Drive files with a permanent watermark.
+ * Used for the Client Portal gallery when the project is not yet paid.
+ */
+export const proxyWatermarkedImage = onRequest({
+  secrets: [googleClientId, googleClientSecret, googleRedirectUri],
+  cors: true,
+}, async (req, res) => {
+  const fileId = req.query.fileId as string;
+  const bookingId = req.query.bookingId as string;
+  const studioName = (req.query.studioName as string) || "LUMINA PROOF";
+
+  if (!fileId || !bookingId) {
+    res.status(400).send("Missing fileId or bookingId");
+    return;
+  }
+
+  const db = getFirestore();
+
+  try {
+    // 1. Verify Booking (Security Check)
+    const bookingSnap = await db.collection("bookings").doc(bookingId).get();
+    if (!bookingSnap.exists) {
+      res.status(404).send("Booking not found");
+      return;
+    }
+
+    const booking = bookingSnap.data();
+    const ownerId = booking?.ownerId;
+
+    // 2. Auth Owner
+    const clientId = googleClientId.value();
+    const clientSecret = googleClientSecret.value();
+    const redirectUri = googleRedirectUri.value();
+
+    const oauthClient = await getAuthenticatedClient(ownerId, clientId, clientSecret, redirectUri);
+    if (!oauthClient) {
+      res.status(503).send("Owner Google Account disconnected");
+      return;
+    }
+
+    // 3. Stream File from Drive
+    const drive = google.drive({ version: "v3", auth: oauthClient });
+    const response = await drive.files.get(
+      { fileId, alt: "media" },
+      { responseType: "stream" }
+    );
+
+    // 4. Create Watermark Overlay (SVG)
+    const svg = `
+            <svg width="400" height="300">
+                <style>
+                    .text { fill: rgba(255,255,255,0.2); font-family: sans-serif; font-weight: bold; font-size: 24px; text-transform: uppercase; }
+                </style>
+                <text x="50%" y="50%" text-anchor="middle" class="text" transform="rotate(-30, 200, 150)">
+                    ${studioName}
+                </text>
+            </svg>
+        `;
+
+    const watermarkBuffer = Buffer.from(svg);
+
+    // 5. Process with Sharp
+    res.setHeader("Content-Type", "image/jpeg");
+    res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 24h
+
+    const pipeline = sharp();
+
+    pipeline
+      .resize(1200, 1200, { fit: "inside", withoutEnlargement: true })
+      .composite([{
+        input: watermarkBuffer,
+        gravity: "center",
+        tile: true,
+      }])
+      .jpeg({ quality: 75 })
+      .pipe(res);
+
+    response.data.pipe(pipeline);
+  } catch (error: any) {
+    logger.error("Watermark Proxy Error", error);
+    if (!res.headersSent) res.status(500).send("Failed to process image");
+  }
+});
+
+/**
+ * Trigger: Runs when a Booking document is updated.
+ * Goal: Detect when a client confirms their selection and notify the photographer.
+ */
+export const onBookingUpdate = onDocumentUpdated("bookings/{bookingId}", async (event) => {
+    const before = event.data?.before.data();
+    const after = event.data?.after.data();
+
+    if (!before || !after) return;
+
+    // Check if selectionSubmitted changed from false (or undefined) to true
+    if (!before.selectionSubmitted && after.selectionSubmitted) {
+        const db = getFirestore();
+        const booking = after;
+        
+        try {
+            // 1. Create In-App Notification
+            const notification = {
+                id: `n-sel-${Date.now()}`,
+                title: "Selection Confirmed",
+                message: `${booking.clientName} has finalized their photo selection.`,
+                time: new Date().toISOString(),
+                read: false,
+                type: "SUCCESS",
+                link: "dashboard",
+                ownerId: booking.ownerId
+            };
+
+            await db.collection("notifications").add(notification);
+
+            // 2. Fetch Owner Email
+            const ownerSnap = await db.collection("users").doc(booking.ownerId).get();
+            const ownerData = ownerSnap.data();
+            const ownerEmail = ownerData?.email;
+
+            if (ownerEmail) {
+                // 3. Send Email Notification
+                const subject = `Selection Confirmed: ${booking.clientName}`;
+                const html = `
+                    <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                        <h2 style="color: #10b981;">Selection Finalized!</h2>
+                        <p>Hi there,</p>
+                        <p><strong>${booking.clientName}</strong> has just submitted their photo selection for the project <strong>"${booking.package}"</strong>.</p>
+                        <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                            <p style="margin: 0;"><strong>Date:</strong> ${new Date(booking.date).toLocaleDateString()}</p>
+                            <p style="margin: 5px 0 0 0;"><strong>Status:</strong> Awaiting Post-Production</p>
+                        </div>
+                        <p>You can now view the selected photos in the project dashboard and proceed with the editing workflow.</p>
+                        <a href="https://lumina-studio.web.app/dashboard" style="display: inline-block; background: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Open Dashboard</a>
+                        <p style="font-size: 12px; color: #777; margin-top: 30px;">This is an automated notification from Lumina.</p>
+                    </div>
+                `;
+
+                await transporter.sendMail({
+                    from: '"Lumina System" <system@lumina.id>',
+                    to: ownerEmail,
+                    subject: subject,
+                    html: html,
+                });
+
+                logger.info(`[Email] Notification sent to ${ownerEmail} for Booking ${event.params.bookingId}.`);
+            } else {
+                logger.warn(`[Email] Could not find email for Owner ${booking.ownerId}. Skipping email notification.`);
+            }
+
+            logger.info(`[Notification] Selection confirmed for Booking ${event.params.bookingId}. Notification created.`);
+
+        } catch (error) {
+            logger.error("Failed to process booking update trigger", error);
+        }
+    }
+});
 
 /**
  * Retrieves file list from a Booking's linked Google Drive folder.
@@ -200,6 +372,8 @@ export const downloadGalleryZip = onRequest({
     }
 
     const ownerId = booking.ownerId;
+    const part = parseInt(req.query.part as string || "1");
+    const chunkSize = parseInt(req.query.size as string || "50");
 
     // 2. Auth Owner
     const clientId = googleClientId.value();
@@ -215,7 +389,7 @@ export const downloadGalleryZip = onRequest({
     const drive = google.drive({ version: "v3", auth: oauthClient });
 
     // 3. Set ZIP Headers
-    const filename = `Gallery-${booking.clientName.replace(/[^a-zA-Z0-9]/g, "_")}.zip`;
+    const filename = `Gallery-${booking.clientName.replace(/[^a-zA-Z0-9]/g, "_")}-Part${part}.zip`;
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
@@ -240,30 +414,45 @@ export const downloadGalleryZip = onRequest({
     // Pipe archive data to the response
     archive.pipe(res);
 
-    // 5. Fetch File List (Recursive or Flat?) - Flat for now
+    // 5. Fetch File List
+    // We fetch all (up to reasonable limit) then slice, to ensure consistent ordering (orderBy name)
     const query = `'${booking.driveFolderId}' in parents and trashed = false`;
     const listRes = await drive.files.list({
       q: query,
       fields: "files(id, name, mimeType)",
-      pageSize: 100, // Limit to prevent timeout
+      orderBy: "name",
+      pageSize: 1000, // Fetch up to 1000 to handle large galleries
       supportsAllDrives: true,
       includeItemsFromAllDrives: true,
     });
 
-    const files = listRes.data.files || [];
+    const allFiles = listRes.data.files || [];
+    const startIndex = (part - 1) * chunkSize;
+    const endIndex = startIndex + chunkSize;
+    const filesToZip = allFiles.slice(startIndex, endIndex);
+
+    if (filesToZip.length === 0) {
+       // Handle empty range
+       archive.finalize();
+       return;
+    }
 
     // 6. Iterate and Append to Archive
-    for (const file of files) {
+    for (const file of filesToZip) {
       // Skip folders inside zip for now to avoid complexity
       if (file.mimeType === "application/vnd.google-apps.folder") continue;
 
       // Get Stream
-      const streamRes = await drive.files.get(
-        { fileId: file.id!, alt: "media" },
-        { responseType: "stream" }
-      );
-
-      archive.append(streamRes.data, { name: file.name || "file" });
+      try {
+        const streamRes = await drive.files.get(
+            { fileId: file.id!, alt: "media" },
+            { responseType: "stream" }
+        );
+        archive.append(streamRes.data, { name: file.name || "file" });
+      } catch (err) {
+          logger.warn(`Failed to download file ${file.id}`, err);
+          // Continue zipping others
+      }
     }
 
     // 7. Finalize

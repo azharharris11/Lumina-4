@@ -165,6 +165,9 @@ const GeneralTab: React.FC<GeneralTabProps> = ({ config, setConfig, onSave, onUp
                     <div><label className="block text-xs text-lumina-muted mb-1 font-bold">Phone</label><input name="phone" value={config.phone} onChange={handleChange} className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-3 text-white"/></div>
                     <div><label className="block text-xs text-lumina-muted mb-1 font-bold">Website</label><input name="website" value={config.website} onChange={handleChange} className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-3 text-white"/></div>
                     
+                    <div><label className="block text-xs text-lumina-muted mb-1 font-bold">Google Business Name</label><input name="googleBusinessName" value={config.googleBusinessName || ''} onChange={handleChange} placeholder="e.g. Lumina Photography" className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-3 text-white"/></div>
+                    <div><label className="block text-xs text-lumina-muted mb-1 font-bold">Google Review Link</label><input name="googleReviewLink" value={config.googleReviewLink || ''} onChange={handleChange} placeholder="https://g.page/r/your-id/review" className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-3 text-white"/></div>
+
                     {/* Logo Upload Section */}
                     <div>
                         <label className="block text-xs text-lumina-muted mb-1 font-bold">{isFreelance ? 'Business Logo' : 'Studio Logo'}</label>

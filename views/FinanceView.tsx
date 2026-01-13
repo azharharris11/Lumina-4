@@ -69,6 +69,61 @@ const FinanceView: React.FC<FinanceViewProps> = ({ accounts, metrics, bookings, 
       }
   };
 
+    const downloadAnchorNode = document.createElement('a'); 
+          downloadAnchorNode.setAttribute("href", dataStr); 
+          downloadAnchorNode.setAttribute("download", "lumina_backup.json"); 
+          document.body.appendChild(downloadAnchorNode); 
+          downloadAnchorNode.click(); 
+          downloadAnchorNode.remove(); 
+      } catch (e) { 
+          console.error("Export Failed:", e); 
+          alert("Failed to export data. See console."); 
+      } 
+  };
+
+  const handleExportCSV = () => {
+      if (!transactions || transactions.length === 0) {
+          alert("No transaction data to export.");
+          return;
+      }
+
+      try {
+          // Define CSV Headers
+          const headers = ["Date", "Description", "Type", "Category", "Amount", "Account", "Status", "Booking ID"];
+          
+          // Helper to find account name
+          const getAccountName = (id: string) => accounts.find(a => a.id === id)?.name || id;
+
+          // Convert transactions to rows
+          const rows = transactions.map(t => [
+              new Date(t.date).toLocaleDateString(),
+              `"${t.description.replace(/"/g, '""')}"`, // Escape quotes
+              t.type,
+              t.category,
+              t.amount,
+              getAccountName(t.accountId),
+              t.status,
+              t.bookingId || "-"
+          ]);
+
+          // Combine headers and rows
+          const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+          
+          // Create Blob and Download
+          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.setAttribute("href", url);
+          link.setAttribute("download", `Lumina_Financial_Report_${new Date().toISOString().split('T')[0]}.csv`);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+      } catch (e) {
+          console.error("CSV Export Failed:", e);
+          alert("Failed to export CSV.");
+      }
+  };
+
   const unpaidCount = bookings.filter(b => {
       const total = (b.price + ((b.items||[]).reduce((s,i)=>s+i.total,0) - b.price)) * (1 + (b.taxSnapshot || config.taxRate)/100);
       return (total - b.paidAmount) > 100 && b.status !== 'CANCELLED';
@@ -96,6 +151,12 @@ const FinanceView: React.FC<FinanceViewProps> = ({ accounts, metrics, bookings, 
             className="bg-lumina-surface border border-lumina-highlight text-white hover:bg-lumina-highlight px-4 py-3 rounded-xl font-bold transition-all flex items-center justify-center text-sm"
           >
             <ArrowRightLeft className="w-4 h-4 mr-2" /> Transfer
+          </button>
+          <button 
+            onClick={handleExportCSV}
+            className="bg-lumina-highlight text-white hover:brightness-110 px-4 py-3 rounded-xl font-bold transition-all flex items-center justify-center text-sm"
+          >
+            <FileText className="w-4 h-4 mr-2" /> Export CSV
           </button>
         </div>
       </div>

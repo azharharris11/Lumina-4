@@ -282,6 +282,39 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ bookings, packages, trans
                    </div>
                </div>
 
+               {/* Conversion Funnel */}
+               <div className="bg-lumina-surface border border-lumina-highlight rounded-2xl p-6">
+                   <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                       <Percent size={20} className="text-lumina-accent"/> Lead Conversion Funnel
+                   </h3>
+                   <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                       {[
+                           { label: 'Total Inquiries', count: bookings.length, color: 'bg-blue-500/20 text-blue-400' },
+                           { label: 'Confirmed Bookings', count: bookings.filter(b => b.status !== 'INQUIRY' && b.status !== 'CANCELLED').length, color: 'bg-indigo-500/20 text-indigo-400' },
+                           { label: 'Completed Projects', count: bookings.filter(b => b.status === 'COMPLETED').length, color: 'bg-emerald-500/20 text-emerald-400' }
+                       ].map((step, i, arr) => {
+                           const percentage = i === 0 ? 100 : Math.round((step.count / arr[i-1].count) * 100) || 0;
+                           return (
+                               <div key={step.label} className="relative flex flex-col items-center">
+                                   <div className={`w-full ${step.color} p-4 rounded-xl border border-current/20 text-center relative z-10`}>
+                                       <p className="text-3xl font-bold mb-1">{step.count}</p>
+                                       <p className="text-xs font-bold uppercase tracking-widest opacity-80">{step.label}</p>
+                                   </div>
+                                   {i < arr.length - 1 && (
+                                       <div className="hidden md:flex absolute right-[-24px] top-1/2 -translate-y-1/2 z-20 bg-lumina-base p-1 rounded-full border border-lumina-highlight">
+                                           <ArrowRight size={16} className="text-lumina-muted"/>
+                                       </div>
+                                   )}
+                                   <div className="mt-4 text-center">
+                                       <span className="text-2xl font-bold text-white">{percentage}%</span>
+                                       <p className="text-[10px] text-lumina-muted uppercase font-bold">Conversion Rate</p>
+                                   </div>
+                               </div>
+                           )
+                       })}
+                   </div>
+               </div>
+
                {/* Charts Row 1 */}
                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                    <div className="lg:col-span-2 bg-lumina-surface border border-lumina-highlight rounded-2xl p-6 flex flex-col">

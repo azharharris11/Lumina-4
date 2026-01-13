@@ -171,6 +171,23 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         console.error("Transactions Listen Error:", error);
     });
 
+    // 3. Listen to Notifications (Firestore-driven)
+    const qNotifications = query(collection(db, "notifications"), where("ownerId", "==", ownerId));
+    const unsubNotifications = onSnapshot(qNotifications, (snapshot) => {
+        const firestoreNotifs = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Notification));
+        // We merge with local ones, but usually, Firestore is the source of truth for alerts
+        setNotifications(prev => {
+            // Filter out any prev notifications that were actually from Firestore (to avoid duplicates on refresh)
+            const localOnly = prev.filter(n => !n.id.startsWith('firestore-')); 
+            // In this prototype, Firestore docs have their own IDs. 
+            // Let's just replace the state with Firestore ones for now, 
+            // or merge intelligently if we have local ephemeral ones.
+            return [...firestoreNotifs, ...localOnly];
+        });
+    }, (error) => {
+        console.error("Notifications Listen Error:", error);
+    });
+
     // Users: Fetch self using doc() to comply with security rules
     // Rule: match /users/{userId} allow read: if isOwner(userId)
     const userDocRef = doc(db, "users", ownerId);
@@ -194,6 +211,7 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         unsubAccounts();
         unsubPackages();
         unsubTransactions();
+        unsubNotifications();
         unsubUsers();
     };
   }, [currentUser]);
