@@ -105,6 +105,7 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = ({
         { id: 'SECTIONS', icon: Layers, label: 'Sections' },
         { id: 'GALLERY', icon: Image, label: 'Gallery' },
         { id: 'PAGES', icon: LayoutTemplate, label: 'Pages' },
+        { id: 'PROMOS', icon: Zap, label: 'Promos' }, // New Tab
         { id: 'STYLES', icon: Palette, label: 'Theme' },
         { id: 'MARKETING', icon: Share2, label: 'Settings' },
     ];
@@ -405,6 +406,124 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = ({
                                     ))}
                                 </Reorder.Group>
                             )}
+                        </div>
+                    </div>
+                )}
+
+                {/* --- PROMOS TAB --- */}
+                {activeTab === 'PROMOS' && (
+                    <div className="space-y-4 animate-in fade-in duration-300">
+                        <button 
+                            onClick={() => {
+                                const newPromo: any = {
+                                    id: `promo-${Date.now()}`,
+                                    slug: 'special-offer',
+                                    title: 'Limited Offer',
+                                    description: 'Book now and save!',
+                                    expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                                    totalSlots: 10,
+                                    bookedSlots: 0,
+                                    packageId: '',
+                                    discountValue: 100000,
+                                    isActive: true
+                                };
+                                handleGlobalChange('promoPages', [...(localSite.promoPages || []), newPromo]);
+                            }}
+                            className="w-full py-3 bg-white text-black rounded-lg font-bold text-xs flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors mb-4"
+                        >
+                            <Plus size={14}/> Create Promo Page
+                        </button>
+
+                        <div className="space-y-3">
+                            {(!localSite.promoPages || localSite.promoPages.length === 0) && (
+                                <p className="text-center text-gray-500 text-xs py-10 italic">No promos created yet.</p>
+                            )}
+                            {(localSite.promoPages || []).map((promo, idx) => (
+                                <div key={promo.id} className="bg-[#252525] border border-[#333] rounded-xl p-4 space-y-4 group">
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex-1">
+                                            <DebouncedInput 
+                                                value={promo.title}
+                                                onChange={(val) => {
+                                                    const newPromos = [...(localSite.promoPages || [])];
+                                                    newPromos[idx] = { ...promo, title: val };
+                                                    handleGlobalChange('promoPages', newPromos);
+                                                }}
+                                                className="bg-transparent text-white font-bold text-sm border-none p-0 focus:ring-0 w-full mb-1"
+                                            />
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] text-gray-500">Slug:</span>
+                                                <DebouncedInput 
+                                                    value={promo.slug}
+                                                    onChange={(val) => {
+                                                        const newPromos = [...(localSite.promoPages || [])];
+                                                        newPromos[idx] = { ...promo, slug: val.toLowerCase().replace(/ /g, '-') };
+                                                        handleGlobalChange('promoPages', newPromos);
+                                                    }}
+                                                    className="bg-[#1a1a1a] text-blue-400 text-[10px] border border-[#333] rounded px-1.5 py-0.5 focus:ring-0"
+                                                />
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={() => {
+                                                const newPromos = localSite.promoPages?.filter(p => p.id !== promo.id);
+                                                handleGlobalChange('promoPages', newPromos);
+                                            }}
+                                            className="text-gray-600 hover:text-rose-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                            <Trash2 size={14}/>
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-[9px] text-gray-500 uppercase font-bold block mb-1">Expiry Date</label>
+                                            <input 
+                                                type="date"
+                                                value={promo.expiryDate}
+                                                onChange={(e) => {
+                                                    const newPromos = [...(localSite.promoPages || [])];
+                                                    newPromos[idx] = { ...promo, expiryDate: e.target.value };
+                                                    handleGlobalChange('promoPages', newPromos);
+                                                }}
+                                                className="w-full bg-[#1a1a1a] border border-[#333] rounded p-1.5 text-[10px] text-white outline-none"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[9px] text-gray-500 uppercase font-bold block mb-1">Total Slots</label>
+                                            <input 
+                                                type="number"
+                                                value={promo.totalSlots}
+                                                onChange={(e) => {
+                                                    const newPromos = [...(localSite.promoPages || [])];
+                                                    newPromos[idx] = { ...promo, totalSlots: parseInt(e.target.value) };
+                                                    handleGlobalChange('promoPages', newPromos);
+                                                }}
+                                                className="w-full bg-[#1a1a1a] border border-[#333] rounded p-1.5 text-[10px] text-white outline-none"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between pt-2 border-t border-[#333]">
+                                        <span className="text-[10px] text-gray-500">Active Status</span>
+                                        <button 
+                                            onClick={() => {
+                                                const newPromos = [...(localSite.promoPages || [])];
+                                                newPromos[idx] = { ...promo, isActive: !promo.isActive };
+                                                handleGlobalChange('promoPages', newPromos);
+                                            }}
+                                            className={`w-8 h-4 rounded-full transition-colors relative ${promo.isActive ? 'bg-emerald-500' : 'bg-gray-700'}`}
+                                        >
+                                            <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform ${promo.isActive ? 'right-0.5' : 'left-0.5'}`}></div>
+                                        </button>
+                                    </div>
+                                    
+                                    <div className="bg-blue-500/10 border border-blue-500/20 p-2 rounded text-[10px] text-blue-300 flex items-center gap-2">
+                                        <Globe size={12}/> 
+                                        <span className="truncate">.../promo/{promo.slug}</span>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 )}

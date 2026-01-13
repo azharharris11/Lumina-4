@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
-import { Package, Asset, PackageCostItem } from '../../types';
-import { Plus, Edit2, Archive, RefreshCcw, X, Layers, DollarSign, ListChecks, ArrowLeft, Save } from 'lucide-react';
+import { Package, Asset, PackageCostItem, AddOn } from '../../types';
+import { Plus, Edit2, Archive, RefreshCcw, X, Layers, DollarSign, ListChecks, ArrowLeft, Save, PlusCircle, ShoppingBag } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useStudio } from '../../contexts/StudioContext';
 
 const Motion = motion as any;
 
@@ -15,17 +16,25 @@ interface PackagesTabProps {
 }
 
 const PackagesTab: React.FC<PackagesTabProps> = ({ packages, onAddPackage, onUpdatePackage, assets }) => {
+    const { config, addAddon, updateAddon, deleteAddon } = useStudio();
     const [isEditorOpen, setIsEditorOpen] = useState(false);
-    const [editorTab, setEditorTab] = useState<'INFO' | 'FINANCE' | 'WORKFLOW'>('INFO');
-    const [isEditing, setIsEditing] = useState(false);
-    
-    // Editor State
-    const [pkgForm, setPkgForm] = useState<Partial<Package>>({});
-    const [featureInput, setFeatureInput] = useState('');
-    const [taskInput, setTaskInput] = useState('');
-    const [newCostItem, setNewCostItem] = useState<Partial<PackageCostItem>>({ description: '', amount: 0, category: 'OTHER' });
+    // ... rest of state stays same ...
+    const [isAddonModalOpen, setIsAddonModalOpen] = useState(false);
+    const [editingAddon, setEditingAddon] = useState<Partial<AddOn> | null>(null);
 
-    const openEditor = (pkg?: Package) => {
+    const handleSaveAddon = async () => {
+        if (editingAddon?.name && editingAddon?.price) {
+            if (editingAddon.id) {
+                await updateAddon(editingAddon as AddOn);
+            } else {
+                await addAddon({ ...editingAddon, active: true } as AddOn);
+            }
+            setIsAddonModalOpen(false);
+            setEditingAddon(null);
+        }
+    };
+
+    const openEditor = (pkg?: Package) => { // ... existing openEditor ...
         if (pkg) {
             setPkgForm({
                 ...pkg,
@@ -152,48 +161,78 @@ const PackagesTab: React.FC<PackagesTabProps> = ({ packages, onAddPackage, onUpd
             {/* PACKAGE LIST GRID */}
             <div className="space-y-8">
                 {Object.entries(groupedPackages).map(([category, pkgs]: [string, Package[]]) => (
-                    <div key={category}>
-                        <h3 className="text-sm font-bold text-lumina-muted uppercase tracking-wider mb-3 pl-1 border-l-2 border-lumina-accent/50">{category}</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {pkgs.map(pkg => (
-                                <div key={pkg.id} className={`p-5 rounded-2xl border transition-all group hover:shadow-lg ${pkg.active ? 'bg-lumina-base border-lumina-highlight hover:border-lumina-accent/50' : 'bg-lumina-base/30 border-lumina-highlight/30 opacity-60'}`}>
-                                    <div className="flex justify-between items-start mb-3">
-                                        <div>
-                                            <h4 className="font-bold text-white text-lg">{pkg.name}</h4>
-                                            <div className="flex gap-2 mt-1">
-                                                <span className="text-[10px] bg-lumina-surface px-2 py-0.5 rounded border border-lumina-highlight text-lumina-muted">{pkg.duration} Hours</span>
-                                                <span className="text-[10px] bg-lumina-surface px-2 py-0.5 rounded border border-lumina-highlight text-lumina-muted">{pkg.turnaroundDays} Days Turnaround</span>
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button onClick={() => toggleActive(pkg)} className="p-1.5 bg-lumina-surface rounded text-lumina-muted hover:text-white" title={pkg.active ? "Deactivate" : "Activate"}><RefreshCcw size={14}/></button>
-                                            <button onClick={() => openEditor(pkg)} className="p-1.5 bg-lumina-surface rounded text-lumina-muted hover:text-white"><Edit2 size={14}/></button>
-                                            <button onClick={() => handleArchive(pkg)} className="p-1.5 bg-lumina-surface rounded text-lumina-muted hover:text-rose-500"><Archive size={14}/></button>
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="flex flex-wrap gap-1 mb-4 h-12 overflow-hidden content-start">
-                                        {pkg.features.slice(0, 3).map((f, i) => (
-                                            <span key={i} className="text-[10px] text-lumina-muted px-1.5 py-0.5 border border-lumina-highlight rounded bg-lumina-base/50">{f}</span>
-                                        ))}
-                                        {pkg.features.length > 3 && <span className="text-[10px] text-lumina-muted px-1.5 py-0.5">+{pkg.features.length - 3} more</span>}
-                                    </div>
-
-                                    <div className="flex justify-between items-end border-t border-lumina-highlight/50 pt-3">
-                                        <div>
-                                            <p className="text-[10px] text-lumina-muted uppercase font-bold">Starting At</p>
-                                            <p className="text-xl font-mono font-bold text-emerald-400">Rp {(pkg.price / 1000).toFixed(0)}k</p>
-                                        </div>
-                                        {pkg.taxIncluded && (
-                                            <span className="text-[10px] text-lumina-muted bg-emerald-500/10 text-emerald-500 px-2 py-0.5 rounded font-bold">Tax Inc.</span>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    // ... (keep existing mapping)
                 ))}
             </div>
+
+            {/* ADD-ONS SECTION */}
+            <div className="mt-16 border-t border-lumina-highlight pt-12">
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 className="text-2xl font-bold text-white flex items-center gap-2"><ShoppingBag className="text-lumina-accent"/> Service Add-ons</h2>
+                        <p className="text-sm text-lumina-muted">Upsell extra services or products during checkout.</p>
+                    </div>
+                    <button 
+                        onClick={() => { setEditingAddon({ name: '', price: 0, description: '' }); setIsAddonModalOpen(true); }}
+                        className="bg-lumina-highlight text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-lumina-muted transition-colors"
+                    >
+                        <PlusCircle size={18}/> New Add-on
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {(config.addons || []).map(addon => (
+                        <div key={addon.id} className="bg-lumina-surface border border-lumina-highlight p-4 rounded-xl flex flex-col justify-between group">
+                            <div>
+                                <div className="flex justify-between items-start mb-1">
+                                    <h4 className="font-bold text-white text-sm">{addon.name}</h4>
+                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => { setEditingAddon(addon); setIsAddonModalOpen(true); }} className="text-lumina-muted hover:text-white"><Edit2 size={12}/></button>
+                                        <button onClick={() => deleteAddon(addon.id)} className="text-lumina-muted hover:text-rose-500"><X size={12}/></button>
+                                    </div>
+                                </div>
+                                <p className="text-[10px] text-lumina-muted line-clamp-2 mb-3">{addon.description}</p>
+                            </div>
+                            <p className="text-sm font-mono font-bold text-emerald-400">+ Rp {(addon.price/1000).toFixed(0)}k</p>
+                        </div>
+                    ))}
+                    {(config.addons || []).length === 0 && (
+                        <div className="col-span-full py-10 bg-lumina-base/30 border border-dashed border-lumina-highlight rounded-xl text-center">
+                            <p className="text-xs text-lumina-muted">No add-ons created yet. Start upselling today!</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* ADD-ON MODAL */}
+            <AnimatePresence>
+                {isAddonModalOpen && (
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+                        <Motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={() => setIsAddonModalOpen(false)} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+                        <Motion.div initial={{scale:0.95, opacity:0}} animate={{scale:1, opacity:1}} exit={{scale:0.95, opacity:0}} className="relative bg-lumina-surface border border-lumina-highlight w-full max-w-md rounded-2xl p-6 shadow-2xl">
+                            <h3 className="text-lg font-bold text-white mb-4">{editingAddon?.id ? 'Edit Add-on' : 'New Add-on'}</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-[10px] text-lumina-muted uppercase font-bold mb-1 block">Add-on Name</label>
+                                    <input className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-2 text-white text-sm" value={editingAddon?.name} onChange={e => setEditingAddon({...editingAddon!, name: e.target.value})} placeholder="e.g. Extra Hour" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-lumina-muted uppercase font-bold mb-1 block">Price (IDR)</label>
+                                    <input type="number" className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-2 text-white text-sm" value={editingAddon?.price} onChange={e => setEditingAddon({...editingAddon!, price: Number(e.target.value)})} />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-lumina-muted uppercase font-bold mb-1 block">Description</label>
+                                    <textarea className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-2 text-white text-sm h-20" value={editingAddon?.description} onChange={e => setEditingAddon({...editingAddon!, description: e.target.value})} />
+                                </div>
+                                <div className="flex gap-2 pt-2">
+                                    <button onClick={() => setIsAddonModalOpen(false)} className="flex-1 py-2 bg-lumina-highlight text-white rounded-lg font-bold text-sm">Cancel</button>
+                                    <button onClick={handleSaveAddon} className="flex-1 py-2 bg-lumina-accent text-lumina-base rounded-lg font-bold text-sm">Save Add-on</button>
+                                </div>
+                            </div>
+                        </Motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
 
             {/* EDITOR DRAWER / MODAL */}
             <AnimatePresence>

@@ -60,6 +60,10 @@ interface StudioContextType {
   updateAccount: (account: Account) => Promise<void>;
   deleteAccount: (id: string) => Promise<void>;
 
+  addAddon: (addon: AddOn) => Promise<void>;
+  updateAddon: (addon: AddOn) => Promise<void>;
+  deleteAddon: (id: string) => Promise<void>;
+
   completeOnboarding: (data: OnboardingData) => Promise<void>;
   triggerAutomation: (status: ProjectStatus, bookingId?: string) => Promise<void>;
   addNotification: (notif: Partial<Notification>) => void;
@@ -340,7 +344,16 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const addClient = async (client: Client) => {
       if(!currentUser) return;
-      await setDoc(doc(db, "clients", client.id), { ...client, ownerId: currentUser.id });
+      
+      // Generate referral code if missing
+      const refCode = client.referralCode || `LUM-${client.name.substring(0,3).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      
+      await setDoc(doc(db, "clients", client.id), { 
+          ...client, 
+          ownerId: currentUser.id,
+          referralCode: refCode,
+          referralCredits: client.referralCredits || 0
+      });
   };
 
   const updateClient = async (client: Client) => {
@@ -564,6 +577,27 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
   };
 
+  const addAddon = async (addon: AddOn) => {
+      if(!currentUser) return;
+      const configRef = doc(db, "studios", currentUser.id);
+      const updatedAddons = [...(config.addons || []), { ...addon, id: `addon-${Date.now()}`, ownerId: currentUser.id }];
+      await updateDoc(configRef, { addons: updatedAddons });
+  };
+
+  const updateAddon = async (addon: AddOn) => {
+      if(!currentUser) return;
+      const configRef = doc(db, "studios", currentUser.id);
+      const updatedAddons = (config.addons || []).map(a => a.id === addon.id ? addon : a);
+      await updateDoc(configRef, { addons: updatedAddons });
+  };
+
+  const deleteAddon = async (id: string) => {
+      if(!currentUser) return;
+      const configRef = doc(db, "studios", currentUser.id);
+      const updatedAddons = (config.addons || []).filter(a => a.id !== id);
+      await updateDoc(configRef, { addons: updatedAddons });
+  };
+
   const completeOnboarding = async (data: OnboardingData) => {
       if (!currentUser) return;
       const ownerId = currentUser.id;
@@ -734,6 +768,7 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         addPackage, updatePackage, deletePackage,
         addUser, updateUser, deleteUser,
         addAccount, updateAccount, deleteAccount,
+        addAddon, updateAddon, deleteAddon,
         completeOnboarding,
         triggerAutomation,
         addNotification, dismissNotification

@@ -196,6 +196,8 @@ export interface Booking {
   selectionSubmitted?: boolean; // New Flag
   googleSync?: boolean; // Added for calendar sync preference
   ownerId?: string;
+  referredByClientId?: string; // ID of the client who referred this booking
+  referralDiscountValue?: number; // Amount discounted due to referral
 }
 
 export interface AssetLog {
@@ -232,6 +234,32 @@ export interface Client {
   joinedDate?: string;
   avatar?: string;
   ownerId?: string;
+  referralCode?: string; // For sharing
+  referralCredits?: number; // Earned from referring others
+  specialDates?: { label: string, date: string }[]; // Birthdays, Anniversaries, etc.
+}
+
+export interface AddOn {
+    id: string;
+    name: string;
+    description: string;
+    price: number;
+    category?: 'SERVICE' | 'PRODUCT';
+    active: boolean;
+    ownerId?: string;
+}
+
+export interface PromoPage {
+    id: string;
+    slug: string;
+    title: string;
+    description: string;
+    expiryDate: string; // For countdown
+    totalSlots: number;
+    bookedSlots: number;
+    packageId: string; // The specific package this promo applies to
+    discountValue: number;
+    isActive: boolean;
 }
 
 export interface Notification {
@@ -379,6 +407,7 @@ export interface SiteConfig {
     };
     testimonials?: SiteTestimonial[];
     faq?: SiteFAQ[];
+    promoPages?: PromoPage[]; // Moved here
     beforeAfter?: {
         enabled: boolean;
         beforeImage: string;
@@ -481,6 +510,8 @@ export interface StudioConfig {
   clientCategories?: string[];
 
   site: SiteConfig;
+  promoPages?: PromoPage[]; // New: Scarcity landing pages
+  addons?: AddOn[]; // New: Upselling add-ons
   ownerId?: string;
 }
 

@@ -53,6 +53,7 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
       price: number;
       notes: string;
       syncGoogle: boolean;
+      selectedAddonIds: string[];
   }>({
       date: getLocalDateString(),
       timeStart: '10:00',
@@ -62,13 +63,85 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
       photographerId: photographers[0]?.id || '',
       price: 0,
       notes: '',
-      syncGoogle: true // Default to true, backend handles actual sync check
+      syncGoogle: true,
+      selectedAddonIds: []
   });
 
   const [newClientForm, setNewClientForm] = useState({ name: '', phone: '', email: '', instagram: '', category: 'NEW' });
   const [paymentForm, setPaymentForm] = useState({ amount: 0, accountId: '' });
   const [discountForm, setDiscountForm] = useState<{ type: 'FIXED' | 'PERCENT', value: number }>({ type: 'FIXED', value: 0 });
   const [showDiscountInput, setShowDiscountInput] = useState(false);
+
+  const calculateTotal = () => {
+      let subtotal = bookingForm.price;
+      
+      const addonSubtotal = (bookingForm.selectedAddonIds || []).reduce((sum, id) => {
+          const addon = config.addons?.find(a => a.id === id);
+          return sum + (addon?.price || 0);
+      }, 0);
+
+      subtotal += addonSubtotal;
+      
+      // Apply Discount
+      let discountAmount = 0;
+      if (discountForm.value > 0) {
+          if (discountForm.type === 'PERCENT') {
+              discountAmount = subtotal * (discountForm.value / 100);
+          } else {
+              discountAmount = discountForm.value;
+          }
+      }
+      
+      const taxableAmount = Math.max(0, subtotal - discountAmount);
+      const tax = config.taxRate || 0;
+      const taxAmount = taxableAmount * (tax / 100);
+      
+      return {
+          subtotal,
+          addonSubtotal,
+          discountAmount,
+          taxAmount,
+          total: taxableAmount + taxAmount
+      };
+  };
+
+  const toggleAddon = (id: string) => {
+      setBookingForm(prev => ({
+          ...prev,
+          selectedAddonIds: prev.selectedAddonIds.includes(id) 
+            ? prev.selectedAddonIds.filter(a => a !== id)
+            : [...prev.selectedAddonIds, id]
+      }));
+  };
+
+  // Referral States
+  const [referralCodeInput, setReferralCodeInput] = useState('');
+  const [referrerClient, setReferrerClient] = useState<Client | null>(null);
+  const [isValidatingReferral, setIsValidatingReferral] = useState(false);
+
+  const handleValidateReferral = () => {
+      if (!referralCodeInput) return;
+      setIsValidatingReferral(true);
+      
+      // Find client with this code (Simulation, ideally should be a server call for security)
+      const found = clients.find(c => c.referralCode?.toUpperCase() === referralCodeInput.toUpperCase());
+      
+      if (found) {
+          if (found.id === selectedClient?.id) {
+              alert("You cannot refer yourself!");
+              setReferrerClient(null);
+          } else {
+              setReferrerClient(found);
+              // Auto-apply Rp 50,000 discount for new client
+              setDiscountForm({ type: 'FIXED', value: 50000 });
+              setShowDiscountInput(true);
+          }
+      } else {
+          alert("Invalid referral code.");
+          setReferrerClient(null);
+      }
+      setIsValidatingReferral(false);
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -350,10 +423,12 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
               notes: bookingForm.notes,
               googleSync: bookingForm.syncGoogle,
               logs: [],
-              discount: discountAmount > 0 ? { 
+              discount: totals.discountAmount > 0 ? { 
                   type: discountForm.type, 
                   value: discountForm.value 
-              } : undefined
+              } : undefined,
+              referredByClientId: referrerClient?.id || '',
+              referralDiscountValue: referrerClient ? totals.discountAmount : 0
           };
 
           try {
@@ -566,6 +641,24 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
                                     </div>
                                 </div>
 
+                                {config.addons && config.addons.length > 0 && (
+                                    <div className="pt-2">
+                                        <label className="text-xs font-bold text-lumina-muted uppercase mb-3 block">Recommended Add-ons</label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {config.addons.map(addon => (
+                                                <button 
+                                                    key={addon.id}
+                                                    onClick={() => toggleAddon(addon.id)}
+                                                    className={`px-4 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-2 ${bookingForm.selectedAddonIds.includes(addon.id) ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-lumina-base border-lumina-highlight text-lumina-muted hover:border-lumina-muted'}`}
+                                                >
+                                                    {bookingForm.selectedAddonIds.includes(addon.id) ? <CheckCircle2 size={14}/> : <Plus size={14}/>}
+                                                    {addon.name} (+Rp {addon.price.toLocaleString()})
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-4">
                                         <h3 className="text-sm font-bold text-white border-b border-lumina-highlight pb-2">Logistics</h3>
@@ -625,6 +718,41 @@ const NewBookingModal: React.FC<NewBookingModalProps> = ({ isOpen, onClose, phot
                                         <div>
                                             <label className="text-xs text-lumina-muted block mb-1">Internal Notes</label>
                                             <textarea className="w-full bg-lumina-base border border-lumina-highlight rounded-lg p-2 text-white text-sm h-20 resize-none focus:border-lumina-accent outline-none" placeholder="Special requests..." value={bookingForm.notes} onChange={e => setBookingForm({...bookingForm, notes: e.target.value})} />
+                                        </div>
+
+                                        {/* Referral Input */}
+                                        <div className="pt-2">
+                                            <label className="text-xs text-lumina-muted block mb-1 uppercase font-bold tracking-widest">Referral Code (Optional)</label>
+                                            <div className="flex gap-2">
+                                                <input 
+                                                    placeholder="ENTER CODE" 
+                                                    className={`flex-1 bg-lumina-base border rounded-lg p-2 text-white text-sm font-mono tracking-widest outline-none transition-colors ${referrerClient ? 'border-emerald-500 bg-emerald-500/5' : 'border-lumina-highlight focus:border-lumina-accent'}`}
+                                                    value={referralCodeInput}
+                                                    onChange={e => setReferralCodeInput(e.target.value.toUpperCase())}
+                                                    disabled={!!referrerClient}
+                                                />
+                                                {!referrerClient ? (
+                                                    <button 
+                                                        onClick={handleValidateReferral}
+                                                        disabled={!referralCodeInput || isValidatingReferral}
+                                                        className="px-4 bg-lumina-highlight hover:bg-lumina-muted text-white text-xs font-bold rounded-lg transition-all disabled:opacity-50"
+                                                    >
+                                                        {isValidatingReferral ? <Loader2 size={14} className="animate-spin"/> : 'Apply'}
+                                                    </button>
+                                                ) : (
+                                                    <button 
+                                                        onClick={() => { setReferrerClient(null); setReferralCodeInput(''); }}
+                                                        className="px-4 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-bold rounded-lg border border-rose-500/30"
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {referrerClient && (
+                                                <Motion.p initial={{opacity:0}} animate={{opacity:1}} className="text-[10px] text-emerald-400 mt-1 font-bold">
+                                                    ✓ Verified: Referred by {referrerClient.name}. Rp 50,000 discount applied.
+                                                </Motion.p>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

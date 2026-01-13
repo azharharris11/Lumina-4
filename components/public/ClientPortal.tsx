@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Booking, StudioConfig, ProofingItem, ActivityLog } from '../../types';
-import { CheckCircle2, Download, MessageCircle, HardDrive, Lock, Image as ImageIcon, Heart, LayoutDashboard, Grid, Send, FileSignature, Loader2, Eye, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { CheckCircle2, Download, MessageCircle, HardDrive, Lock, Image as ImageIcon, Heart, LayoutDashboard, Grid, Send, FileSignature, Loader2, Eye, ChevronLeft, ChevronRight, X, Users } from 'lucide-react';
 import InvoiceModal from '../InvoiceModal';
 import ContractViewer from '../ContractViewer';
 import { motion, AnimatePresence } from 'framer-motion';
-import { updateDoc, doc, arrayUnion } from 'firebase/firestore';
+import { updateDoc, doc, arrayUnion, setDoc } from 'firebase/firestore';
 import { db, functions } from '../../firebase';
 import { httpsCallable } from 'firebase/functions';
 
@@ -571,11 +571,35 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
                                 <a 
                                     href={`https://wa.me/${config.phone.replace(/\D/g, '')}`} 
                                     target="_blank" 
-                                    className="w-full py-3 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2 hover:brightness-110"
+                                    className="w-full py-3 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2 hover:brightness-110 mb-4"
                                     style={{ backgroundColor: accentColor }}
                                 >
                                     <MessageCircle size={18} /> Chat Support
                                 </a>
+
+                                {/* Referral Card */}
+                                <div className="mt-6 pt-6 border-t border-white/10">
+                                    <div className="bg-gradient-to-br from-emerald-500/10 to-blue-500/10 border border-emerald-500/20 rounded-xl p-4">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <div className="p-1.5 bg-emerald-500 text-white rounded-lg">
+                                                <Users size={16}/>
+                                            </div>
+                                            <h4 className="font-bold text-emerald-400 text-sm">Refer & Earn</h4>
+                                        </div>
+                                        <p className="text-[11px] text-neutral-400 mb-4">Share your code with friends and get <span className="text-emerald-400 font-bold">Rp 50,000</span> for every booking!</p>
+                                        
+                                        <div className="bg-black/40 border border-white/10 rounded-lg p-3 flex items-center justify-between group cursor-pointer hover:border-emerald-500/50 transition-colors"
+                                             onClick={() => {
+                                                 navigator.clipboard.writeText(booking.id.substring(0, 8).toUpperCase());
+                                                 alert("Code copied to clipboard!");
+                                             }}
+                                        >
+                                            <span className="font-mono font-bold text-white tracking-widest">{booking.id.substring(0, 8).toUpperCase()}</span>
+                                            <Send size={14} className="text-neutral-500 group-hover:text-emerald-400"/>
+                                        </div>
+                                        <p className="text-[9px] text-neutral-500 mt-2 text-center">Click code to copy</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </Motion.div>

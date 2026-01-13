@@ -112,6 +112,24 @@ const ClientDetailPanel: React.FC<ClientDetailPanelProps> = ({
                     </div>
                 </div>
 
+                {/* Referral Status */}
+                <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-500/5 to-purple-500/5 border border-indigo-500/20">
+                    <div className="flex justify-between items-center mb-3">
+                        <span className="text-xs text-indigo-300 font-bold uppercase tracking-wider">Referral Program</span>
+                        <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full font-bold">Active</span>
+                    </div>
+                    <div className="flex justify-between items-end">
+                        <div>
+                            <p className="text-[10px] text-lumina-muted mb-1">UNIQUE CODE</p>
+                            <p className="text-lg font-mono font-bold text-white tracking-widest">{client.referralCode || '-'}</p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-[10px] text-lumina-muted mb-1">EARNED CREDITS</p>
+                            <p className="text-lg font-bold text-emerald-400 font-mono">Rp {(client.referralCredits || 0).toLocaleString()}</p>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Editable Fields */}
                 {isEditing ? (
                     <div className="space-y-4 p-4 bg-lumina-highlight/10 rounded-xl border border-lumina-highlight">

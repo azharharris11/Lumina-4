@@ -32,6 +32,63 @@ export { getGoogleAuthURL, googleAuthCallback, disconnectGoogle, getGoogleAccess
  * Scheduled Function: Runs on the 1st of every month at 01:00 AM.
  * Goal: Aggregate financial data for the previous month and store in 'metrics'.
  */
+/**
+ * Scheduled Function: Runs every day at 09:00 AM.
+ * Goal: Find clients with upcoming special dates (birthdays, etc.) and send a discount.
+ */
+export const specialMomentCron = onSchedule("0 9 * * *", async (event) => {
+  const db = getFirestore();
+  const today = new Date();
+  const inSevenDays = new Date(today);
+  inSevenDays.setDate(today.getDate() + 7);
+
+  const targetMonthDay = `${String(inSevenDays.getMonth() + 1).padStart(2, "0")}-${String(inSevenDays.getDate()).padStart(2, "0")}`;
+
+  logger.info(`Checking Special Moments for Month-Day: ${targetMonthDay}`);
+
+  try {
+    const clientsSnap = await db.collection("clients").get();
+
+    for (const clientDoc of clientsSnap.docs) {
+      const client = clientDoc.data();
+      if (!client.specialDates || !Array.isArray(client.specialDates)) continue;
+
+      const matchingMoment = client.specialDates.find((m: any) => m.date.includes(targetMonthDay));
+
+      if (matchingMoment && client.email) {
+        const discountCode = `CELEBRATE-${client.name.substring(0, 3).toUpperCase()}-${Math.floor(Math.random()*1000)}`;
+        const subject = `A special gift for your ${matchingMoment.label}!`;
+        const html = `
+                    <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px; text-align: center;">
+                        <h1 style="color: #f472b6;">Happy ${matchingMoment.label}! 🎂</h1>
+                        <p>Hi ${client.name},</p>
+                        <p>To celebrate your upcoming special day, we want to give you a special gift!</p>
+                        <div style="background: #fdf2f8; padding: 20px; border-radius: 15px; margin: 25px 0; border: 2px dashed #f472b6;">
+                            <p style="margin: 0; color: #db2777; font-weight: bold; font-size: 18px;">20% DISCOUNT</p>
+                            <p style="margin: 5px 0; font-size: 12px; color: #be185d;">Valid for any session booked this month</p>
+                            <h2 style="margin: 15px 0 0 0; letter-spacing: 5px; color: #000;">${discountCode}</h2>
+                        </div>
+                        <p>We'd love to capture your special moments again.</p>
+                        <a href="https://lumina-studio.web.app/" style="display: inline-block; background: #f472b6; color: white; padding: 12px 30px; text-decoration: none; border-radius: 30px; font-weight: bold;">Book Your Session</a>
+                        <p style="font-size: 10px; color: #999; margin-top: 30px;">Sent automatically with ❤️ from Lumina.</p>
+                    </div>
+                `;
+
+        await transporter.sendMail({
+          from: "\"Lumina Studio\" <marketing@lumina.id>",
+          to: client.email,
+          subject: subject,
+          html: html,
+        });
+
+        logger.info(`Special moment email sent to ${client.email} for ${matchingMoment.label}`);
+      }
+    }
+  } catch (error) {
+    logger.error("Special Moment Cron Failed", error);
+  }
+});
+
 export const monthlyFinancialAggregator = onSchedule("0 1 1 * *", async (event) => {
   const db = getFirestore();
   const lastMonth = new Date();
@@ -688,6 +745,42 @@ export const onBookingUpdated = onDocumentUpdated({
     }
   } catch (error) {
     logger.error("Failed to sync booking update to Google Calendar", error);
+  }
+
+  // --- REFERRAL SYSTEM LOGIC ---
+  // When a booking is marked as COMPLETED, reward the referrer if exists
+  if (after.status === "COMPLETED" && before.status !== "COMPLETED" && after.referredByClientId) {
+    const db = getFirestore();
+    try {
+      const referrerRef = db.collection("clients").doc(after.referredByClientId);
+      const rewardAmount = 50000; // Fixed Rp 50,000 reward per referral, adjust as needed
+
+      await db.runTransaction(async (transaction) => {
+        const referrerSnap = await transaction.get(referrerRef);
+        if (!referrerSnap.exists) return;
+
+        const currentCredits = referrerSnap.data()?.referralCredits || 0;
+        transaction.update(referrerRef, {
+          referralCredits: currentCredits + rewardAmount,
+        });
+
+        // Create a notification for the referrer
+        const notifRef = db.collection("notifications").doc(`n-ref-${Date.now()}`);
+        transaction.set(notifRef, {
+          id: notifRef.id,
+          title: "Referral Reward Earned!",
+          message: `You earned Rp ${rewardAmount.toLocaleString()} credit from ${after.clientName}'s booking.`,
+          time: new Date().toISOString(),
+          read: false,
+          type: "SUCCESS",
+          ownerId: after.ownerId,
+          link: "clients",
+        });
+      });
+      logger.info(`Referral reward processed for client ${after.referredByClientId}`);
+    } catch (err) {
+      logger.error("Failed to process referral reward", err);
+    }
   }
 });
 

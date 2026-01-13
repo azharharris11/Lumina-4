@@ -69,7 +69,7 @@ const ProductionKanbanCard: React.FC<ProductionKanbanCardProps> = ({ booking, cu
                         {booking.clientName.charAt(0)}
                     </div>
                 </div>
-            </button>
+            </div>
         </Motion.div>
     );
 };

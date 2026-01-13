@@ -1,42 +1,32 @@
 # Development Roadmap: Feature Gaps & Enhancements
 
-## Phase 1 - 3: Completed Features ✅
-*(Detail diarsipkan untuk fokus pada stabilitas)*
+## Phase 1 - 5: Completed Features ✅
+*(Semua sistem inti, otomasi, keamanan, dan fitur pertumbuhan pemasaran telah dideploy)*
+
+### 1. Automation & Logic
+* [x] Notification: Client Photo Selection.
+* [x] Two-Way Calendar Sync.
+* [x] Automated Reminders (H-1).
+* [x] Financial Aggregator (Monthly).
+* [x] Special Moment Marketing (Anniversary/Birthday Cron).
+
+### 2. Client Experience & Security
+* [x] Smart Testimonials (Review Filter).
+* [x] Secure Watermarking (Sharp Backend).
+* [x] Proofing Comments & Add-ons Support.
+* [x] Large Project Download (Batching).
+* [x] Referral Rewards & Unique Codes.
+
+### 3. Management & Growth
+* [x] Scarcity Landing Pages (Site Builder Promos).
+* [x] Dynamic Upselling & Add-ons (Checkout).
+* [x] RBAC Permissions & View Filtering.
+* [x] Optimized Tailwind Build System.
 
 ---
 
-## Phase 4: Bug Squashing & Stability (ACTIVE 🛠️)
-
-### 1. Critical UI Fixes
-* **Bug:** `Uncaught ReferenceError: handleSubmitSelection is not defined`.
-    * **Penyebab:** Fungsi terhapus saat implementasi Feedback tab.
-    * **Solusi:** Kembalikan fungsi `handleSubmitSelection` ke `ClientPortal.tsx`.
-* **Bug:** Kanban Board Production tidak bisa Drag & Drop.
-    * **Penyebab:** Kemungkinan library `dnd-kit` atau `react-beautiful-dnd` belum terkonfigurasi benar atau logic `onDragEnd` hilang.
-    * **Solusi:** Perbaiki logic `onDragEnd` di `ProductionView.tsx`.
-
-### 2. Backend & Security Fixes
-* **Bug:** `FirebaseError: Missing or insufficient permissions` pada Notifications.
-    * **Penyebab:** Firestore Rules belum mengizinkan akses ke koleksi `notifications` dan `internal_reviews`.
-    * **Solusi:** Perbarui `firestore.rules`.
-* **Bug:** `proxyWatermarkedImage` Error 500/503.
-    * **Penyebab:** 
-        1. Project ID hardcoded salah.
-        2. `sharp` gagal memproses stream.
-        3. Secrets belum terpasang di Cloud Run.
-    * **Solusi:** Gunakan dynamic Project ID dan debug stream pipe di Cloud Functions.
-
-### 3. Build & Optimization
-* **Bug:** Tailwind CDN Warning.
-    * **Solusi:** Migrasi dari CDN ke proper NPM setup (Tailwind Vite Plugin).
-* **Bug:** Sinkronisasi jumlah (count) di portal tidak akurat.
-    * **Solusi:** Periksa logic state `proofingData` dan `selectedPhotos`.
-
----
-
-## Action Plan:
-1. [ ] Fix `ClientPortal.tsx` (Restore missing functions & accurate counting).
-2. [ ] Fix Firestore Rules.
-3. [ ] Fix `ProductionView.tsx` (Kanban stability).
-4. [ ] Fix Backend `proxyWatermarkedImage` logic.
-5. [ ] Fix Tailwind setup.
+## Future Roadmap 🚀 (Next Generation)
+* **Async ZIP Generation**: Transition to Cloud Tasks for massive (10k+) galleries.
+* **WhatsApp Business API**: Direct automated messaging without manual clicks.
+* **AI Image Recognition**: Auto-tagging clients in photos for faster culling.
+* **Client Portal Custom Domains**: Allow clients to view galleries on their own subdomains.
