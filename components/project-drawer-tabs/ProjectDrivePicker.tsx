@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, ChevronRight, FolderPlus, X, ArrowLeft, Folder, MoreVertical, Edit, Trash2 } from 'lucide-react';
+import { Loader2, ChevronRight, FolderPlus, X, ArrowLeft, Folder, MoreVertical, Edit, Trash2, HardDrive, Users } from 'lucide-react';
 
 const Motion = motion as any;
 
@@ -17,7 +17,10 @@ interface ProjectDrivePickerProps {
   onSelectFolder: (folderId: string, folderName: string) => void;
 }
 
+type DriveSource = 'MY_DRIVE' | 'SHARED_DRIVES';
+
 const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose, googleToken, onSelectFolder }) => {
+  const [driveSource, setDriveSource] = useState<DriveSource>('MY_DRIVE');
   const [driveBreadcrumbs, setDriveBreadcrumbs] = useState<DriveFolder[]>([{id: 'root', name: 'My Drive'}]);
   const [driveFolderList, setDriveFolderList] = useState<DriveFolder[]>([]);
   const [isLoadingDrive, setIsLoadingDrive] = useState(false);
@@ -31,10 +34,9 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   
-  // State for Selection removed - simplifying to "Browse & Select Current" model
-  
   const currentDriveFolderId = driveBreadcrumbs[driveBreadcrumbs.length - 1].id;
   const currentDriveFolderName = driveBreadcrumbs[driveBreadcrumbs.length - 1].name;
+  const isSharedDriveRoot = driveSource === 'SHARED_DRIVES' && driveBreadcrumbs.length === 1;
 
   const fetchDriveFolders = async (parentId: string) => {
       if (!googleToken) return;
@@ -43,8 +45,16 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
       setErrorMsg(null);
       
       try {
-          const query = `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-          const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)&orderBy=name&includeItemsFromAllDrives=true&supportsAllDrives=true`;
+          let url = '';
+          
+          if (driveSource === 'SHARED_DRIVES' && parentId === 'drives-root') {
+              // List Shared Drives
+              url = `https://www.googleapis.com/drive/v3/drives?pageSize=50&orderBy=name`;
+          } else {
+              // List Files (Folders)
+              const query = `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+              url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)&orderBy=name&includeItemsFromAllDrives=true&supportsAllDrives=true`;
+          }
           
           const res = await fetch(url, { headers: { 'Authorization': `Bearer ${googleToken}` } });
           
@@ -58,7 +68,7 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
               console.error("Drive API Error:", text);
               
               if (res.status === 403) {
-                  setErrorMsg("Access Denied (403). Your token might lack 'Full Drive Access' scope. Please Disconnect & Reconnect in Settings.");
+                  setErrorMsg("Access Denied (403). Ensure you have permission. If you just reconnected, try refreshing the page.");
               } else {
                   setErrorMsg(`Error ${res.status}: ${text}`);
               }
@@ -66,7 +76,9 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
           }
           
           const data = await res.json();
-          setDriveFolderList(data.files || []);
+          // Map 'drives' or 'files' to common structure
+          const items = data.drives || data.files || [];
+          setDriveFolderList(items.map((item: any) => ({ id: item.id, name: item.name })));
       } catch (e: any) { 
           console.error(e); 
           setErrorMsg(e.message || "Network Error");
@@ -80,12 +92,20 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
           fetchDriveFolders(currentDriveFolderId);
       } else {
           // Reset on close
+          setDriveSource('MY_DRIVE');
           setDriveBreadcrumbs([{id: 'root', name: 'My Drive'}]);
           setDriveFolderList([]);
           setAuthError(false);
           setErrorMsg(null);
       }
-  }, [isOpen, currentDriveFolderId]);
+  }, [isOpen, currentDriveFolderId, driveSource]);
+
+  const handleSwitchSource = (source: DriveSource) => {
+      if (source === driveSource) return;
+      setDriveSource(source);
+      setDriveBreadcrumbs(source === 'MY_DRIVE' ? [{id: 'root', name: 'My Drive'}] : [{id: 'drives-root', name: 'Shared Drives'}]);
+      setActiveMenuId(null);
+  };
 
   const handleNavigateDrive = (folder: DriveFolder) => { 
       setDriveBreadcrumbs(prev => [...prev, folder]); 
@@ -100,12 +120,17 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
   };
 
   const createSubFolder = async () => {
-      if (!newFolderName.trim() || !googleToken) return;
+      if (!newFolderName.trim() || !googleToken || isSharedDriveRoot) return;
       setActionLoading(true);
       setErrorMsg(null);
       try {
-          const metadata = { name: newFolderName, mimeType: 'application/vnd.google-apps.folder', parents: [currentDriveFolderId] };
-          const res = await fetch('https://www.googleapis.com/drive/v3/files', {
+          const metadata: any = { 
+              name: newFolderName, 
+              mimeType: 'application/vnd.google-apps.folder', 
+              parents: [currentDriveFolderId] 
+          };
+          
+          const res = await fetch('https://www.googleapis.com/drive/v3/files?supportsAllDrives=true', {
               method: 'POST',
               headers: { 'Authorization': `Bearer ${googleToken}`, 'Content-Type': 'application/json' },
               body: JSON.stringify(metadata)
@@ -132,9 +157,9 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
   };
 
   const renameItem = async () => {
-      if (!renamingItem || !renameInput.trim() || !googleToken) return;
+      if (!renamingItem || !renameInput.trim() || !googleToken || isSharedDriveRoot) return;
       try {
-          const res = await fetch(`https://www.googleapis.com/drive/v3/files/${renamingItem.id}`, {
+          const res = await fetch(`https://www.googleapis.com/drive/v3/files/${renamingItem.id}?supportsAllDrives=true`, {
               method: 'PATCH',
               headers: { 'Authorization': `Bearer ${googleToken}`, 'Content-Type': 'application/json' },
               body: JSON.stringify({ name: renameInput })
@@ -148,9 +173,9 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
   };
 
   const trashItem = async (item: DriveFolder) => {
-      if (!googleToken || !window.confirm(`Delete folder "${item.name}"?`)) return;
+      if (!googleToken || !window.confirm(`Delete folder "${item.name}"?`) || isSharedDriveRoot) return;
       try {
-          const res = await fetch(`https://www.googleapis.com/drive/v3/files/${item.id}`, {
+          const res = await fetch(`https://www.googleapis.com/drive/v3/files/${item.id}?supportsAllDrives=true`, {
               method: 'PATCH',
               headers: { 'Authorization': `Bearer ${googleToken}`, 'Content-Type': 'application/json' },
               body: JSON.stringify({ trashed: true })
@@ -164,6 +189,10 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
   };
 
   const handleConfirmSelection = () => {
+      if (isSharedDriveRoot) {
+          alert("Please select a folder inside a Shared Drive, not the Drive itself.");
+          return;
+      }
       onSelectFolder(currentDriveFolderId, currentDriveFolderName);
   };
 
@@ -200,7 +229,7 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
                     )}
                 </div>
                 <div className="flex items-center gap-2">
-                    {googleToken && !authError && (
+                    {googleToken && !authError && !isSharedDriveRoot && (
                         <button onClick={() => setShowNewFolderInput(!showNewFolderInput)} className="p-2 hover:bg-lumina-highlight rounded text-lumina-muted hover:text-white" title="New Folder">
                             <FolderPlus size={18} />
                         </button>
@@ -209,6 +238,22 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
                         <X size={18} />
                     </button>
                 </div>
+            </div>
+
+            {/* Source Toggle */}
+            <div className="flex border-b border-lumina-highlight">
+                <button 
+                    onClick={() => handleSwitchSource('MY_DRIVE')}
+                    className={`flex-1 py-3 text-xs font-bold flex items-center justify-center gap-2 transition-colors ${driveSource === 'MY_DRIVE' ? 'bg-lumina-surface text-lumina-accent border-b-2 border-lumina-accent' : 'bg-lumina-base text-lumina-muted hover:text-white'}`}
+                >
+                    <HardDrive size={14} /> My Drive
+                </button>
+                <button 
+                    onClick={() => handleSwitchSource('SHARED_DRIVES')}
+                    className={`flex-1 py-3 text-xs font-bold flex items-center justify-center gap-2 transition-colors ${driveSource === 'SHARED_DRIVES' ? 'bg-lumina-surface text-lumina-accent border-b-2 border-lumina-accent' : 'bg-lumina-base text-lumina-muted hover:text-white'}`}
+                >
+                    <Users size={14} /> Shared Drives
+                </button>
             </div>
 
             {!googleToken || authError || errorMsg ? (
@@ -261,7 +306,7 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
                                         onClick={() => handleNavigateDrive(folder)}
                                     >
                                         <div className="flex items-center gap-3 overflow-hidden flex-1">
-                                            <Folder className="shrink-0 text-blue-400 fill-blue-400/20" size={18} />
+                                            {isSharedDriveRoot ? <Users className="shrink-0 text-indigo-400" size={18}/> : <Folder className="shrink-0 text-blue-400 fill-blue-400/20" size={18} />}
                                             {renamingItem?.id === folder.id ? (
                                                 <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                                                     <input 
@@ -281,20 +326,22 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
                                         <div className="flex items-center gap-1">
                                             <ChevronRight size={16} className="text-lumina-muted" />
 
-                                            <div className="relative" onClick={e => e.stopPropagation()}>
-                                                <button 
-                                                    className="p-1 text-lumina-muted hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                                                    onClick={() => setActiveMenuId(activeMenuId === folder.id ? null : folder.id)}
-                                                >
-                                                    <MoreVertical size={14} />
-                                                </button>
-                                                {activeMenuId === folder.id && (
-                                                    <div className="absolute right-0 top-full mt-1 w-32 bg-black border border-lumina-highlight rounded shadow-xl z-50 overflow-hidden">
-                                                        <button onClick={() => { setRenamingItem(folder); setRenameInput(folder.name); setActiveMenuId(null); }} className="w-full text-left px-3 py-2 text-xs text-white hover:bg-lumina-highlight flex items-center gap-2"><Edit size={12}/> Rename</button>
-                                                        <button onClick={() => trashItem(folder)} className="w-full text-left px-3 py-2 text-xs text-rose-500 hover:bg-lumina-highlight flex items-center gap-2"><Trash2 size={12}/> Delete</button>
-                                                    </div>
-                                                )}
-                                            </div>
+                                            {!isSharedDriveRoot && (
+                                                <div className="relative" onClick={e => e.stopPropagation()}>
+                                                    <button 
+                                                        className="p-1 text-lumina-muted hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        onClick={() => setActiveMenuId(activeMenuId === folder.id ? null : folder.id)}
+                                                    >
+                                                        <MoreVertical size={14} />
+                                                    </button>
+                                                    {activeMenuId === folder.id && (
+                                                        <div className="absolute right-0 top-full mt-1 w-32 bg-black border border-lumina-highlight rounded shadow-xl z-50 overflow-hidden">
+                                                            <button onClick={() => { setRenamingItem(folder); setRenameInput(folder.name); setActiveMenuId(null); }} className="w-full text-left px-3 py-2 text-xs text-white hover:bg-lumina-highlight flex items-center gap-2"><Edit size={12}/> Rename</button>
+                                                            <button onClick={() => trashItem(folder)} className="w-full text-left px-3 py-2 text-xs text-rose-500 hover:bg-lumina-highlight flex items-center gap-2"><Trash2 size={12}/> Delete</button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
@@ -311,9 +358,10 @@ const ProjectDrivePicker: React.FC<ProjectDrivePickerProps> = ({ isOpen, onClose
                     <div className="p-4 border-t border-lumina-highlight bg-lumina-base rounded-b-xl flex justify-between items-center">
                         <button 
                             onClick={handleConfirmSelection}
-                            className="w-full px-4 py-3 bg-lumina-accent text-lumina-base font-bold text-sm rounded-lg hover:bg-lumina-accent/90"
+                            disabled={isSharedDriveRoot}
+                            className="w-full px-4 py-3 bg-lumina-accent text-lumina-base font-bold text-sm rounded-lg hover:bg-lumina-accent/90 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            Select This Folder: "{currentDriveFolderName}"
+                            {isSharedDriveRoot ? "Open a Drive to Select" : `Select This Folder: "${currentDriveFolderId === 'root' ? 'My Drive' : currentDriveFolderName}"`}
                         </button>
                     </div>
                 </>

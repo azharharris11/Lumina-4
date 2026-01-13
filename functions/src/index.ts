@@ -1,4 +1,4 @@
-import {onDocumentCreated} from "firebase-functions/v2/firestore";
+import {onDocumentCreated, onDocumentUpdated, onDocumentDeleted} from "firebase-functions/v2/firestore";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {initializeApp} from "firebase-admin/app";
@@ -228,7 +228,7 @@ export const createBooking = onCall({
             const startTime = new Date(`${newBooking.date}T${newBooking.timeStart}:00`);
             const endTime = new Date(startTime.getTime() + newBooking.duration * 60 * 60 * 1000);
 
-            await calendar.events.insert({
+            const insertResult = await calendar.events.insert({
               calendarId: "primary",
               requestBody: {
                 summary: `Lumina: ${newBooking.clientName} - ${newBooking.package}`,
@@ -238,7 +238,11 @@ export const createBooking = onCall({
                 end: {dateTime: endTime.toISOString()},
               },
             });
-            logger.info(`Google Calendar Event created for booking ${newBooking.id}`);
+
+            if (insertResult.data.id) {
+              await db.collection("bookings").doc(newBooking.id).update({ googleEventId: insertResult.data.id });
+              logger.info(`Google Calendar Event created: ${insertResult.data.id}`);
+            }
           }
         }
       } catch (gError: any) {
@@ -259,6 +263,7 @@ export const createBooking = onCall({
     throw new HttpsError("internal", "An internal error occurred while creating the booking.");
   }
 });
+
 
 export const claimSubdomain = onCall({ cors: true, invoker: "public" }, async (request) => {
   // 1. Authentication
@@ -437,5 +442,94 @@ export const processTransaction = onCall({ cors: true, invoker: "public" }, asyn
     logger.error("Transaction failed", error);
     if (error instanceof HttpsError) throw error;
     throw new HttpsError("internal", error.message || "Transaction failed.");
+  }
+});
+
+// --- AUTOMATIC CALENDAR SYNC (UPDATES & DELETES) ---
+
+export const onBookingUpdated = onDocumentUpdated({
+  document: "bookings/{bookingId}",
+  secrets: [googleClientId, googleClientSecret, googleRedirectUri],
+}, async (event) => {
+  const before = event.data?.before.data();
+  const after = event.data?.after.data();
+
+  if (!before || !after) return;
+
+  // Check if connected to Google Calendar
+  const googleEventId = after.googleEventId || before.googleEventId;
+  if (!googleEventId) return;
+
+  const ownerId = after.ownerId;
+
+  // Detect Changes
+  const isCancelled = after.status === "CANCELLED" && before.status !== "CANCELLED";
+  const isRescheduled = after.date !== before.date || after.timeStart !== before.timeStart || after.duration !== before.duration;
+
+  if (!isCancelled && !isRescheduled) return;
+
+  try {
+    const clientId = googleClientId.value();
+    const clientSecret = googleClientSecret.value();
+    const redirectUri = googleRedirectUri.value();
+
+    const oauthClient = await getAuthenticatedClient(ownerId, clientId, clientSecret, redirectUri);
+    if (!oauthClient) return;
+
+    const calendar = (await import("googleapis")).google.calendar({version: "v3", auth: oauthClient});
+
+    if (isCancelled) {
+      await calendar.events.delete({
+        calendarId: "primary",
+        eventId: googleEventId,
+      });
+      logger.info(`Google Calendar Event ${googleEventId} deleted (Booking Cancelled).`);
+    } else if (isRescheduled) {
+      const startTime = new Date(`${after.date}T${after.timeStart}:00`);
+      const endTime = new Date(startTime.getTime() + (after.duration * 60 * 60 * 1000));
+
+      await calendar.events.patch({
+        calendarId: "primary",
+        eventId: googleEventId,
+        requestBody: {
+          start: { dateTime: startTime.toISOString() },
+          end: { dateTime: endTime.toISOString() },
+          summary: `Lumina: ${after.clientName} - ${after.package} (Updated)`,
+          description: `[UPDATED] Client Phone: ${after.clientPhone}\nPackage: ${after.package}\nNotes: ${after.notes || "-"}`,
+        },
+      });
+      logger.info(`Google Calendar Event ${googleEventId} updated.`);
+    }
+  } catch (error) {
+    logger.error("Failed to sync booking update to Google Calendar", error);
+  }
+});
+
+export const onBookingDeleted = onDocumentDeleted({
+  document: "bookings/{bookingId}",
+  secrets: [googleClientId, googleClientSecret, googleRedirectUri],
+}, async (event) => {
+  const booking = event.data?.data();
+  if (!booking || !booking.googleEventId) return;
+
+  const ownerId = booking.ownerId;
+
+  try {
+    const clientId = googleClientId.value();
+    const clientSecret = googleClientSecret.value();
+    const redirectUri = googleRedirectUri.value();
+
+    const oauthClient = await getAuthenticatedClient(ownerId, clientId, clientSecret, redirectUri);
+    if (!oauthClient) return;
+
+    const calendar = (await import("googleapis")).google.calendar({version: "v3", auth: oauthClient});
+
+    await calendar.events.delete({
+      calendarId: "primary",
+      eventId: booking.googleEventId,
+    });
+    logger.info(`Google Calendar Event ${booking.googleEventId} deleted (Booking Removed).`);
+  } catch (error) {
+    logger.error("Failed to delete Google Calendar event", error);
   }
 });

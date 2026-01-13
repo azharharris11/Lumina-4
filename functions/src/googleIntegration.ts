@@ -32,8 +32,26 @@ export const disconnectGoogle = onCall({
   const db = getFirestore();
 
   try {
+    // 0. Revoke the token if it exists
+    const docRef = db.collection("users").doc(userId).collection("system").doc("google_auth");
+    const docSnap = await docRef.get();
+
+    if (docSnap.exists) {
+      const data = docSnap.data();
+      if (data?.accessToken) {
+        const oauth2Client = createOAuthClient();
+        try {
+          await oauth2Client.revokeToken(data.accessToken);
+          logger.info(`Revoked Google token for user ${userId}`);
+        } catch (revokeError) {
+          logger.warn(`Failed to revoke token for user ${userId}`, revokeError);
+          // Continue with deletion anyway
+        }
+      }
+    }
+
     // 1. Delete the auth document
-    await db.collection("users").doc(userId).collection("system").doc("google_auth").delete();
+    await docRef.delete();
 
     // 2. Update the user profile flag
     await db.collection("users").doc(userId).update({
@@ -66,7 +84,8 @@ export const getGoogleAuthURL = onCall({
     access_type: "offline",
     scope: scopes,
     state: request.auth.uid,
-    prompt: "consent",
+    prompt: "consent", // Force consent screen to ensure scopes are granted
+    include_granted_scopes: true, // Include previously granted scopes
   });
 
   return {url};
@@ -87,6 +106,15 @@ export const googleAuthCallback = onRequest({secrets: [googleClientId, googleCli
   try {
     const {tokens} = await oauth2Client.getToken(code);
 
+    // Verify scopes
+    const receivedScopes = tokens.scope || "";
+    const hasDriveScope = receivedScopes.includes("https://www.googleapis.com/auth/drive");
+
+    if (!hasDriveScope) {
+      logger.warn(`User ${userId} did not grant Drive scope.`);
+      // We still save it, but the UI should warn the user later
+    }
+
     await db.collection("users").doc(userId).collection("system").doc("google_auth").set({
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
@@ -102,7 +130,9 @@ export const googleAuthCallback = onRequest({secrets: [googleClientId, googleCli
     res.send(`
       <div style="font-family: sans-serif; text-align: center; padding-top: 50px;">
         <h1 style="color: #10b981;">Success!</h1>
-        <p>Google Account connected securely. You can close this window and return to Lumina.</p>
+        <p>Google Account connected securely.</p>
+        ${!hasDriveScope ? "<p style=\"color: #f59e0b; font-weight: bold;\">Warning: You did not grant full Drive access. Some features may not work.</p>" : ""}
+        <p>You can close this window and return to Lumina.</p>
         <script>setTimeout(() => window.close(), 3000);</script>
       </div>
     `);
@@ -145,6 +175,7 @@ export async function getAuthenticatedClient(
     access_token: data?.accessToken,
     refresh_token: data?.refreshToken,
     expiry_date: data?.expiryDate,
+    scope: data?.scope, // Set scope
   });
 
   oauth2Client.on("tokens", async (tokens) => {
@@ -155,6 +186,7 @@ export async function getAuthenticatedClient(
     if (tokens.refresh_token) {
       updateData.refreshToken = tokens.refresh_token;
     }
+    // Note: scope is usually not returned in refresh unless it changed
     await db.collection("users").doc(userId).collection("system").doc("google_auth").set(updateData, {merge: true});
   });
 
@@ -189,8 +221,19 @@ export const getGoogleAccessToken = onCall({
       throw new HttpsError("unavailable", "Failed to retrieve access token.");
     }
 
+    // Check Scope
+    const db = getFirestore();
+    const docSnap = await db.collection("users").doc(userId).collection("system").doc("google_auth").get();
+    const scopes = docSnap.data()?.scope || "";
+
+    // Check specifically for drive scope
+    if (!scopes.includes("https://www.googleapis.com/auth/drive")) {
+      throw new HttpsError("permission-denied", "Missing 'Full Drive Access'. Please reconnect in Settings and ensure you tick all boxes.");
+    }
+
     return { accessToken: token };
   } catch (error) {
+    if (error instanceof HttpsError) throw error;
     logger.error("Error retrieving Google Access Token", error);
     throw new HttpsError("internal", "Failed to get access token.");
   }
