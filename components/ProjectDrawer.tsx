@@ -16,6 +16,7 @@ import ProjectDrivePicker from './project-drawer-tabs/ProjectDrivePicker';
 import ProjectFinance from './project-drawer-tabs/ProjectFinance';
 import SettleModal from './finance/modals/SettleModal';
 import InvoiceModal from './InvoiceModal';
+import { shareFolderWithEmail } from '../utils/googleDriveUtils';
 
 interface ProjectDrawerProps {
   isOpen: boolean;
@@ -110,14 +111,30 @@ const ProjectDrawer: React.FC<ProjectDrawerProps> = ({ isOpen, onClose, booking,
 
   const handleDelete = () => { if (booking && onDeleteBooking && window.confirm('Archive project? This will also remove associated financial records.')) { onDeleteBooking(booking.id); onClose(); } };
   
-  const handleSelectFolder = (folderId: string, folderName: string) => { 
+  const handleSelectFolder = async (folderId: string, folderName: string) => { 
       if (booking) { 
           const folderLink = `https://drive.google.com/drive/u/0/folders/${folderId}`; 
+          let logMessage = `Linked Drive folder: ${folderName}`;
+          let shareMessage = "";
+
+          // Auto-Share Logic
+          if (googleToken && booking.clientEmail) {
+              try {
+                  await shareFolderWithEmail(folderId, booking.clientEmail, googleToken, 'reader');
+                  shareMessage = ` & Shared with ${booking.clientEmail}`;
+                  logMessage += ` (Shared with Client)`;
+                  alert(`Folder Linked!\nSuccessfully shared with ${booking.clientEmail}.`);
+              } catch (e: any) {
+                  console.error("Auto-share failed", e);
+                  alert(`Folder Linked, but failed to share with client.\nError: ${e.message}`);
+              }
+          }
+
           onUpdateBooking({ 
             ...booking, 
             deliveryUrl: folderLink, 
             driveFolderId: folderId,
-            logs: [createLocalLog('DRIVE_LINK', `Linked Drive folder: ${folderName}`), ...(booking.logs || [])] 
+            logs: [createLocalLog('DRIVE_LINK', logMessage), ...(booking.logs || [])] 
           }); 
           setShowDrivePicker(false); 
       } 

@@ -1,17 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { Booking, StudioConfig, ProofingItem, ActivityLog } from '../../types';
-import { CheckCircle2, Download, MessageCircle, HardDrive, Lock, Image as ImageIcon, Heart, LayoutDashboard, Grid, Send, FileSignature } from 'lucide-react';
+import { CheckCircle2, Download, MessageCircle, HardDrive, Lock, Image as ImageIcon, Heart, LayoutDashboard, Grid, Send, FileSignature, Loader2, Eye } from 'lucide-react';
 import InvoiceModal from '../InvoiceModal';
 import ContractViewer from '../ContractViewer';
 import { motion, AnimatePresence } from 'framer-motion';
 import { updateDoc, doc, arrayUnion } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { db, functions } from '../../firebase';
+import { httpsCallable } from 'firebase/functions';
 
 const Motion = motion as any;
 
 interface ClientPortalProps {
     booking: Booking;
     config: StudioConfig;
+}
+
+interface DriveFile {
+    id: string;
+    name: string;
+    thumbnail?: string;
+    downloadUrl?: string;
+    viewUrl?: string;
+    mimeType: string;
+    isImage: boolean;
+    size?: string;
 }
 
 const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, config }) => {
@@ -23,6 +35,11 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
     const [loginError, setLoginError] = useState('');
     const [showInvoice, setShowInvoice] = useState(false);
     
+    // Gallery State
+    const [galleryFiles, setGalleryFiles] = useState<DriveFile[]>([]);
+    const [isLoadingGallery, setIsLoadingGallery] = useState(false);
+    const [galleryError, setGalleryError] = useState<string | null>(null);
+
     // Optimistic UI for selections
     const [proofingData, setProofingData] = useState<ProofingItem[]>(booking.proofingData || []);
     const [isSubmittingSelection, setIsSubmittingSelection] = useState(false);
@@ -32,6 +49,27 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
             setProofingData(booking.proofingData);
         }
     }, [booking.proofingData]);
+
+    // Fetch Gallery Files when tab is active
+    useEffect(() => {
+        if (activeTab === 'GALLERY' && galleryFiles.length === 0 && !galleryError) {
+            const fetchFiles = async () => {
+                setIsLoadingGallery(true);
+                try {
+                    const getFilesFn = httpsCallable(functions, 'getPortalFiles');
+                    const result = await getFilesFn({ bookingId: booking.id });
+                    const data = result.data as { files: DriveFile[] };
+                    setGalleryFiles(data.files || []);
+                } catch (e: any) {
+                    console.error("Gallery Fetch Error:", e);
+                    setGalleryError("Unable to load gallery. Please contact the studio.");
+                } finally {
+                    setIsLoadingGallery(false);
+                }
+            };
+            fetchFiles();
+        }
+    }, [activeTab, booking.id, galleryFiles.length, galleryError]);
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -397,61 +435,141 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
                 {/* --- GALLERY TAB --- */}
                 {activeTab === 'GALLERY' && (
                     <Motion.div initial={{opacity: 0}} animate={{opacity: 1}}>
+                        
+                        {/* Header Section */}
                         <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 md:p-8 mb-8 text-center">
-                            <h2 className="text-2xl font-bold text-white mb-2">Original Files</h2>
+                            <h2 className="text-2xl font-bold text-white mb-2">Project Gallery</h2>
                             <p className="text-neutral-400 mb-6 max-w-lg mx-auto text-sm">
-                                You can download all your high-resolution original files directly from our secure drive.
+                                {isPaid 
+                                    ? "View and download your high-resolution files below." 
+                                    : "Preview your gallery below. Please settle the remaining balance to unlock high-resolution downloads."}
                             </p>
-                            {booking.deliveryUrl ? (
-                                <a href={booking.deliveryUrl} target="_blank" className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-full font-bold transition-transform hover:scale-105 shadow-lg shadow-blue-900/20">
-                                    <Download size={18}/> 📂 Download Full Gallery
-                                </a>
-                            ) : (
-                                <button disabled className="bg-neutral-800 text-neutral-500 px-8 py-3 rounded-full font-bold cursor-not-allowed flex items-center gap-2 mx-auto">
-                                    <Lock size={16}/> Link Not Ready
-                                </button>
+                            
+                            {!isPaid && (
+                                <div className="inline-flex items-center gap-2 bg-rose-500/10 border border-rose-500/20 text-rose-400 px-4 py-2 rounded-lg text-sm font-bold mb-4">
+                                    <Lock size={14}/> Downloads Locked - Balance Due: Rp {balance.toLocaleString()}
+                                </div>
+                            )}
+
+                            {/* "Download All" Fallback (Only if Paid) */}
+                            {isPaid && booking.deliveryUrl && (
+                                <div className="mt-4">
+                                     <a href={booking.deliveryUrl} target="_blank" className="inline-flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-white px-6 py-2 rounded-full font-bold text-xs transition-colors border border-neutral-700">
+                                        <HardDrive size={14}/> Open in Google Drive
+                                    </a>
+                                </div>
                             )}
                         </div>
 
-                        <div className="mb-6 flex justify-between items-end">
-                            <div>
-                                <h3 className="text-xl font-bold">Select Favorites</h3>
-                                <p className="text-sm text-neutral-400">Click the heart to mark photos for editing.</p>
+                        {/* Gallery Grid */}
+                        {isLoadingGallery ? (
+                            <div className="flex flex-col items-center justify-center py-20">
+                                <Loader2 size={48} className="text-emerald-500 animate-spin mb-4"/>
+                                <p className="text-neutral-500 font-medium">Loading your gallery from secure storage...</p>
                             </div>
-                            {booking.selectionSubmitted && (
-                                <span className="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-xs font-bold border border-emerald-500/30 flex items-center gap-2">
-                                    <CheckCircle2 size={12}/> Selection Submitted
-                                </span>
-                            )}
-                        </div>
+                        ) : galleryError ? (
+                            <div className="text-center py-20 bg-neutral-900 rounded-xl border border-neutral-800">
+                                <p className="text-rose-500 mb-2">{galleryError}</p>
+                            </div>
+                        ) : galleryFiles.length > 0 ? (
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-12">
+                                {galleryFiles.map((file) => (
+                                    <div key={file.id} className="group relative aspect-square bg-neutral-800 rounded-lg overflow-hidden border border-neutral-800 hover:border-emerald-500/50 transition-colors">
+                                        {/* Thumbnail / Icon */}
+                                        {file.isImage && file.thumbnail ? (
+                                            <img 
+                                                src={file.thumbnail.replace('=s220', '=s800')} // Try to get larger thumb
+                                                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                                loading="lazy"
+                                                alt={file.name}
+                                                referrerPolicy="no-referrer"
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full flex flex-col items-center justify-center text-neutral-600">
+                                                <FileSignature size={32} className="mb-2"/>
+                                                <span className="text-[10px] uppercase font-bold px-2 text-center">{file.mimeType.split('/').pop()}</span>
+                                            </div>
+                                        )}
 
-                        {proofingData.length === 0 ? (
-                            <div className="text-center py-20 bg-neutral-900 rounded-xl border border-neutral-800 border-dashed">
-                                <ImageIcon size={48} className="text-neutral-700 mx-auto mb-4"/>
-                                <p className="text-neutral-500">No photos uploaded for proofing yet.</p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2 md:gap-4">
-                                {proofingData.map((photo) => (
-                                    <div key={photo.id} className="relative aspect-square group bg-neutral-800 rounded-lg overflow-hidden">
-                                        <img 
-                                            src={photo.thumbnail} 
-                                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
-                                            loading="lazy" 
-                                            referrerPolicy="no-referrer"
-                                        />
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
-                                            <p className="text-[10px] text-white/70 truncate mb-1 font-mono">{photo.filename}</p>
+                                        {/* Overlay */}
+                                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-4">
+                                            {isPaid ? (
+                                                <>
+                                                    {file.viewUrl && (
+                                                        <a 
+                                                            href={file.viewUrl} 
+                                                            target="_blank" 
+                                                            rel="noopener noreferrer"
+                                                            className="w-10 h-10 rounded-full bg-white/10 hover:bg-white text-white hover:text-black flex items-center justify-center backdrop-blur-sm transition-colors"
+                                                            title="View"
+                                                        >
+                                                            <Eye size={18}/>
+                                                        </a>
+                                                    )}
+                                                    {file.downloadUrl && (
+                                                        <a 
+                                                            href={file.downloadUrl} 
+                                                            target="_blank" 
+                                                            className="w-10 h-10 rounded-full bg-emerald-500 hover:bg-emerald-400 text-white flex items-center justify-center shadow-lg transition-colors"
+                                                            title="Download Original"
+                                                        >
+                                                            <Download size={18}/>
+                                                        </a>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <div className="w-12 h-12 rounded-full bg-black/50 flex items-center justify-center text-rose-500 border border-rose-500/30">
+                                                    <Lock size={20}/>
+                                                </div>
+                                            )}
+                                            <p className="absolute bottom-2 left-2 right-2 text-center text-[10px] text-white/80 truncate font-mono">
+                                                {file.name}
+                                            </p>
                                         </div>
-                                        <button 
-                                            onClick={() => handleToggleHeart(photo.id)}
-                                            className={`absolute top-2 right-2 p-2 rounded-full shadow-md transition-all z-10 ${photo.selected ? 'bg-rose-500 text-white scale-110' : 'bg-black/40 text-white hover:bg-rose-500 hover:text-white'}`}
-                                            disabled={booking.selectionSubmitted}
-                                        >
-                                            <Heart size={16} fill={photo.selected ? "currentColor" : "none"} />
-                                        </button>
                                     </div>
                                 ))}
+                            </div>
+                        ) : (
+                             <div className="text-center py-20 bg-neutral-900 rounded-xl border border-neutral-800 border-dashed mb-8">
+                                <ImageIcon size={48} className="text-neutral-700 mx-auto mb-4"/>
+                                <p className="text-neutral-500">No final deliverables found in the linked folder.</p>
+                            </div>
+                        )}
+
+                        {/* Legacy Proofing Section (If data exists) */}
+                        {proofingData.length > 0 && (
+                            <div className="mt-12 pt-12 border-t border-neutral-800">
+                                <div className="mb-6 flex justify-between items-end">
+                                    <div>
+                                        <h3 className="text-xl font-bold">Proofing & Selection</h3>
+                                        <p className="text-sm text-neutral-400">Select photos for editing.</p>
+                                    </div>
+                                    {booking.selectionSubmitted && (
+                                        <span className="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-xs font-bold border border-emerald-500/30 flex items-center gap-2">
+                                            <CheckCircle2 size={12}/> Selection Submitted
+                                        </span>
+                                    )}
+                                </div>
+                                
+                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2 md:gap-4">
+                                    {proofingData.map((photo) => (
+                                        <div key={photo.id} className="relative aspect-square group bg-neutral-800 rounded-lg overflow-hidden">
+                                            <img 
+                                                src={photo.thumbnail} 
+                                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
+                                                loading="lazy" 
+                                                referrerPolicy="no-referrer"
+                                            />
+                                            <button 
+                                                onClick={() => handleToggleHeart(photo.id)}
+                                                className={`absolute top-2 right-2 p-2 rounded-full shadow-md transition-all z-10 ${photo.selected ? 'bg-rose-500 text-white scale-110' : 'bg-black/40 text-white hover:bg-rose-500 hover:text-white'}`}
+                                                disabled={booking.selectionSubmitted}
+                                            >
+                                                <Heart size={16} fill={photo.selected ? "currentColor" : "none"} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </Motion.div>
