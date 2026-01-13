@@ -3,7 +3,7 @@ import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { 
     LayoutTemplate, Type, Image, Share2, Layers, Palette, ChevronLeft, Save, 
     Undo, Redo, LogOut, Plus, Trash2, GripVertical, Settings, Eye, EyeOff, 
-    Globe, Info, PanelLeftClose, ChevronDown, ChevronRight, CheckCircle2, AlertCircle, Loader2
+    Globe, Info, PanelLeftClose, ChevronDown, ChevronRight, CheckCircle2, AlertCircle, Loader2, Zap
 } from 'lucide-react';
 import { SiteConfig, SiteTheme, SitePage, SiteSection } from '../../types';
 import SiteSectionEditor, { DebouncedInput, DebouncedTextarea, ImageUploader } from './SiteSectionEditor';
