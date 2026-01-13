@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Booking, StudioConfig, ProofingItem, ActivityLog } from '../../types';
-import { CheckCircle2, Download, MessageCircle, HardDrive, Lock, Image as ImageIcon, Heart, LayoutDashboard, Grid, Send, FileSignature, Loader2, Eye } from 'lucide-react';
+import { CheckCircle2, Download, MessageCircle, HardDrive, Lock, Image as ImageIcon, Heart, LayoutDashboard, Grid, Send, FileSignature, Loader2, Eye, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import InvoiceModal from '../InvoiceModal';
 import ContractViewer from '../ContractViewer';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -39,6 +39,7 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
     const [galleryFiles, setGalleryFiles] = useState<DriveFile[]>([]);
     const [isLoadingGallery, setIsLoadingGallery] = useState(false);
     const [galleryError, setGalleryError] = useState<string | null>(null);
+    const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
     // Optimistic UI for selections
     const [proofingData, setProofingData] = useState<ProofingItem[]>(booking.proofingData || []);
@@ -60,6 +61,19 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
                     const result = await getFilesFn({ bookingId: booking.id });
                     const data = result.data as { files: DriveFile[] };
                     setGalleryFiles(data.files || []);
+                    
+                    // Initialize proofing data from files if empty (First time load)
+                    if ((!booking.proofingData || booking.proofingData.length === 0) && data.files.length > 0) {
+                        const initialProofing = data.files.filter(f => f.isImage).map(f => ({
+                            id: f.id,
+                            filename: f.name,
+                            thumbnail: f.thumbnail || '',
+                            selected: false
+                        }));
+                        setProofingData(initialProofing);
+                        // Sync to backend? Maybe wait for user action.
+                    }
+
                 } catch (e: any) {
                     console.error("Gallery Fetch Error:", e);
                     setGalleryError("Unable to load gallery. Please contact the studio.");
@@ -69,7 +83,80 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
             };
             fetchFiles();
         }
-    }, [activeTab, booking.id, galleryFiles.length, galleryError]);
+    }, [activeTab, booking.id, galleryFiles.length, galleryError, booking.proofingData]);
+
+    // Helper to check selection status
+    const isSelected = (fileId: string) => {
+        return proofingData.find(p => p.id === fileId)?.selected || false;
+    };
+
+    const handleToggleHeart = async (file: DriveFile) => {
+        if (booking.selectionSubmitted) return;
+        
+        // Check if item exists in proofingData
+        const existingIndex = proofingData.findIndex(p => p.id === file.id);
+        let newData = [...proofingData];
+
+        if (existingIndex >= 0) {
+            // Toggle
+            newData[existingIndex] = { ...newData[existingIndex], selected: !newData[existingIndex].selected };
+        } else {
+            // Add if missing (shouldn't happen if initialized, but safe fallback)
+            newData.push({
+                id: file.id,
+                filename: file.name,
+                thumbnail: file.thumbnail || '',
+                selected: true
+            });
+        }
+        
+        setProofingData(newData);
+
+        // Silent sync
+        try {
+            await updateDoc(doc(db, "bookings", booking.id), {
+                proofingData: newData
+            });
+        } catch (e) {
+            console.error("Failed to sync selection", e);
+        }
+    };
+
+    const handleDownloadAll = () => {
+        if (!isPaid) return;
+        // Hardcoded base URL for prototype - in production use env var or derived from window.location
+        // Assuming standard Firebase region
+        const projectId = "lumina-f7d88"; 
+        const url = `https://us-central1-${projectId}.cloudfunctions.net/downloadGalleryZip?bookingId=${booking.id}`;
+        window.open(url, '_blank');
+    };
+
+    // Lightbox Navigation
+    const handleNextImage = (e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        if (lightboxIndex !== null && lightboxIndex < galleryFiles.length - 1) {
+            setLightboxIndex(lightboxIndex + 1);
+        }
+    };
+
+    const handlePrevImage = (e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        if (lightboxIndex !== null && lightboxIndex > 0) {
+            setLightboxIndex(lightboxIndex - 1);
+        }
+    };
+
+    // Keyboard Navigation
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (lightboxIndex === null) return;
+            if (e.key === 'ArrowRight') handleNextImage();
+            if (e.key === 'ArrowLeft') handlePrevImage();
+            if (e.key === 'Escape') setLightboxIndex(null);
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [lightboxIndex]);
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -451,13 +538,14 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
                                 </div>
                             )}
 
-                            {/* "Download All" Fallback (Only if Paid) */}
-                            {isPaid && booking.deliveryUrl && (
-                                <div className="mt-4">
-                                     <a href={booking.deliveryUrl} target="_blank" className="inline-flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-white px-6 py-2 rounded-full font-bold text-xs transition-colors border border-neutral-700">
-                                        <HardDrive size={14}/> Open in Google Drive
-                                    </a>
-                                </div>
+                            {/* "Download All" Button */}
+                            {isPaid && galleryFiles.length > 0 && (
+                                <button 
+                                    onClick={handleDownloadAll}
+                                    className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 rounded-full font-bold transition-transform hover:scale-105 shadow-lg shadow-emerald-900/20"
+                                >
+                                    <Download size={18}/> Download All Photos (.zip)
+                                </button>
                             )}
                         </div>
 
@@ -473,12 +561,16 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
                             </div>
                         ) : galleryFiles.length > 0 ? (
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-12">
-                                {galleryFiles.map((file) => (
-                                    <div key={file.id} className="group relative aspect-square bg-neutral-800 rounded-lg overflow-hidden border border-neutral-800 hover:border-emerald-500/50 transition-colors">
-                                        {/* Thumbnail / Icon */}
+                                {galleryFiles.map((file, index) => (
+                                    <div 
+                                        key={file.id} 
+                                        className="group relative aspect-square bg-neutral-800 rounded-lg overflow-hidden border border-neutral-800 hover:border-emerald-500/50 transition-colors cursor-pointer"
+                                        onClick={() => setLightboxIndex(index)}
+                                    >
+                                        {/* Thumbnail */}
                                         {file.isImage && file.thumbnail ? (
                                             <img 
-                                                src={file.thumbnail.replace('=s220', '=s800')} // Try to get larger thumb
+                                                src={file.thumbnail}
                                                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                                                 loading="lazy"
                                                 alt={file.name}
@@ -491,40 +583,26 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
                                             </div>
                                         )}
 
-                                        {/* Overlay */}
-                                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-4">
-                                            {isPaid ? (
-                                                <>
-                                                    {file.viewUrl && (
-                                                        <a 
-                                                            href={file.viewUrl} 
-                                                            target="_blank" 
-                                                            rel="noopener noreferrer"
-                                                            className="w-10 h-10 rounded-full bg-white/10 hover:bg-white text-white hover:text-black flex items-center justify-center backdrop-blur-sm transition-colors"
-                                                            title="View"
-                                                        >
-                                                            <Eye size={18}/>
-                                                        </a>
-                                                    )}
-                                                    {file.downloadUrl && (
-                                                        <a 
-                                                            href={file.downloadUrl} 
-                                                            target="_blank" 
-                                                            className="w-10 h-10 rounded-full bg-emerald-500 hover:bg-emerald-400 text-white flex items-center justify-center shadow-lg transition-colors"
-                                                            title="Download Original"
-                                                        >
-                                                            <Download size={18}/>
-                                                        </a>
-                                                    )}
-                                                </>
-                                            ) : (
-                                                <div className="w-12 h-12 rounded-full bg-black/50 flex items-center justify-center text-rose-500 border border-rose-500/30">
-                                                    <Lock size={20}/>
-                                                </div>
-                                            )}
-                                            <p className="absolute bottom-2 left-2 right-2 text-center text-[10px] text-white/80 truncate font-mono">
-                                                {file.name}
-                                            </p>
+                                        {/* Overlays */}
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-3">
+                                            <div className="flex justify-end">
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); handleToggleHeart(file); }}
+                                                    className={`p-2 rounded-full shadow-md transition-transform hover:scale-110 ${isSelected(file.id) ? 'bg-rose-500 text-white' : 'bg-black/50 text-white hover:bg-rose-500'}`}
+                                                    title={isSelected(file.id) ? "Unselect" : "Select Favorite"}
+                                                >
+                                                    <Heart size={16} fill={isSelected(file.id) ? "currentColor" : "none"} />
+                                                </button>
+                                            </div>
+                                            
+                                            <div className="text-center">
+                                                {!isPaid && (
+                                                    <div className="inline-flex items-center gap-1 bg-black/60 px-2 py-1 rounded text-rose-500 text-[10px] font-bold border border-rose-500/30 mb-2">
+                                                        <Lock size={10}/> Locked
+                                                    </div>
+                                                )}
+                                                <p className="text-[10px] text-white/90 truncate font-mono drop-shadow-md">{file.name}</p>
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
@@ -532,46 +610,87 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
                         ) : (
                              <div className="text-center py-20 bg-neutral-900 rounded-xl border border-neutral-800 border-dashed mb-8">
                                 <ImageIcon size={48} className="text-neutral-700 mx-auto mb-4"/>
-                                <p className="text-neutral-500">No final deliverables found in the linked folder.</p>
+                                <p className="text-neutral-500">No photos found in the linked folder.</p>
                             </div>
                         )}
 
-                        {/* Legacy Proofing Section (If data exists) */}
-                        {proofingData.length > 0 && (
-                            <div className="mt-12 pt-12 border-t border-neutral-800">
-                                <div className="mb-6 flex justify-between items-end">
-                                    <div>
-                                        <h3 className="text-xl font-bold">Proofing & Selection</h3>
-                                        <p className="text-sm text-neutral-400">Select photos for editing.</p>
-                                    </div>
-                                    {booking.selectionSubmitted && (
-                                        <span className="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-xs font-bold border border-emerald-500/30 flex items-center gap-2">
-                                            <CheckCircle2 size={12}/> Selection Submitted
-                                        </span>
-                                    )}
-                                </div>
-                                
-                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2 md:gap-4">
-                                    {proofingData.map((photo) => (
-                                        <div key={photo.id} className="relative aspect-square group bg-neutral-800 rounded-lg overflow-hidden">
-                                            <img 
-                                                src={photo.thumbnail} 
-                                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
-                                                loading="lazy" 
-                                                referrerPolicy="no-referrer"
-                                            />
+                        {/* LIGHTBOX OVERLAY */}
+                        <AnimatePresence>
+                            {lightboxIndex !== null && galleryFiles[lightboxIndex] && (
+                                <Motion.div 
+                                    initial={{ opacity: 0 }} 
+                                    animate={{ opacity: 1 }} 
+                                    exit={{ opacity: 0 }}
+                                    className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-sm flex items-center justify-center"
+                                    onClick={() => setLightboxIndex(null)}
+                                >
+                                    {/* Toolbar */}
+                                    <div className="absolute top-0 left-0 w-full p-4 flex justify-between items-center z-50 bg-gradient-to-b from-black/80 to-transparent" onClick={e => e.stopPropagation()}>
+                                        <p className="text-white text-sm font-mono opacity-80">{galleryFiles[lightboxIndex].name}</p>
+                                        <div className="flex gap-4">
+                                            {isPaid && galleryFiles[lightboxIndex].downloadUrl && (
+                                                <a 
+                                                    href={galleryFiles[lightboxIndex].downloadUrl} 
+                                                    target="_blank" 
+                                                    className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-full text-xs font-bold transition-colors"
+                                                >
+                                                    <Download size={16}/> Download
+                                                </a>
+                                            )}
                                             <button 
-                                                onClick={() => handleToggleHeart(photo.id)}
-                                                className={`absolute top-2 right-2 p-2 rounded-full shadow-md transition-all z-10 ${photo.selected ? 'bg-rose-500 text-white scale-110' : 'bg-black/40 text-white hover:bg-rose-500 hover:text-white'}`}
-                                                disabled={booking.selectionSubmitted}
+                                                onClick={() => setLightboxIndex(null)}
+                                                className="bg-white/10 hover:bg-rose-500/20 hover:text-rose-500 text-white p-2 rounded-full transition-colors"
                                             >
-                                                <Heart size={16} fill={photo.selected ? "currentColor" : "none"} />
+                                                <Eye size={20} className="hidden"/> {/* Placeholder for alignment */}
+                                                <X size={24} /> // Wait, X is not imported? I need to import X.
+                                                {/* Re-using Close logic */}
                                             </button>
                                         </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                                    </div>
+
+                                    {/* Main Image */}
+                                    <div className="w-full h-full p-4 md:p-10 flex items-center justify-center relative">
+                                        <img 
+                                            src={galleryFiles[lightboxIndex].thumbnail?.replace('=s1600', '=s2048') || galleryFiles[lightboxIndex].thumbnail} 
+                                            className="max-h-full max-w-full object-contain shadow-2xl rounded-sm"
+                                            onClick={e => e.stopPropagation()}
+                                        />
+                                        
+                                        {/* Nav Buttons */}
+                                        {lightboxIndex > 0 && (
+                                            <button 
+                                                onClick={handlePrevImage}
+                                                className="absolute left-4 top-1/2 -translate-y-1/2 p-4 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-all"
+                                            >
+                                                <ChevronLeft size={48} /> // Need import
+                                            </button>
+                                        )}
+                                        {lightboxIndex < galleryFiles.length - 1 && (
+                                            <button 
+                                                onClick={handleNextImage}
+                                                className="absolute right-4 top-1/2 -translate-y-1/2 p-4 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-all"
+                                            >
+                                                <ChevronRight size={48} /> // Need import
+                                            </button>
+                                        )}
+                                    </div>
+                                    
+                                    {/* Bottom Toolbar */}
+                                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-4 z-50" onClick={e => e.stopPropagation()}>
+                                        <button 
+                                            onClick={() => handleToggleHeart(galleryFiles[lightboxIndex])}
+                                            className={`px-6 py-3 rounded-full font-bold flex items-center gap-2 shadow-xl transition-transform hover:scale-105
+                                                ${isSelected(galleryFiles[lightboxIndex].id) ? 'bg-rose-500 text-white' : 'bg-white text-black'}
+                                            `}
+                                        >
+                                            <Heart size={20} fill={isSelected(galleryFiles[lightboxIndex].id) ? "currentColor" : "none"} />
+                                            {isSelected(galleryFiles[lightboxIndex].id) ? 'Selected' : 'Select Photo'}
+                                        </button>
+                                    </div>
+                                </Motion.div>
+                            )}
+                        </AnimatePresence>
+
                     </Motion.div>
                 )}
 

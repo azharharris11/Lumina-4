@@ -1,79 +1,109 @@
-# Plan: Switch to Google Drive for File Storage
+# Development Plan: Hyper-Personalized Experience & Adaptive UI/UX
 
-## Objective
-Replace Firebase Storage with the user's connected Google Drive for storing project files to reduce costs.
+## Core Philosophy
+Move away from a "One Size Fits All" interface. The application should behave like a chameleon, adapting its complexity, terminology, and visual hierarchy based on the specific business model of the user (Solo Freelancer vs. Physical Studio vs. Agency).
 
-## Context
-- **Current State**: 
-  - `ProjectFiles.tsx` uploads files to Firebase Storage (`projects/{bookingId}/{filename}`).
-  - `ProjectDrivePicker.tsx` allows selecting a Google Drive folder.
-  - `googleIntegration.ts` handles OAuth with scope `drive.file`.
-- **Goal**:
-  - Uploads initiated in `ProjectFiles` should go to the linked Google Drive folder.
-  - File metadata (link, name, id) should still be stored in Firestore (`booking.files`) for UI consistency, but the binary data resides in Drive.
+---
 
-## Step-by-Step Implementation
+## Phase 1: The "Identity" Onboarding Flow
+We will restructure `OnboardingView.tsx` into a branching wizard.
 
-### 1. Data Model Updates
-Ensure the `Booking` object can store the Drive Folder ID reliably.
-- We already use `booking.deliveryUrl`. We should ensure we also store `booking.driveFolderId` when a folder is selected in `ProjectDrivePicker`.
+### Step 1: The Basics (Identity)
+*   **Fields:** Name, Email (pre-filled), Studio/Business Name.
+*   **Hook:** "Let's give your business a home."
 
-### 2. Google Drive Upload Logic
-Create a utility function to upload files directly to Google Drive from the browser using the stored `accessToken`.
+### Step 2: The Business Model (The Fork)
+*   **Question:** "How do you operate?"
+*   **Option A: "I am a Freelancer / On-Location Photographer"**
+    *   *Implication:* No physical studio rooms to manage. "Inventory" is portable gear.
+*   **Option B: "I own/manage a Physical Studio Space"**
+    *   *Implication:* Needs Room Management, Calendar overlap logic, specific location settings.
+*   **Option C: "I run a Production House / Agency"**
+    *   *Implication:* Heavy focus on Team, Payroll, and Project Management status flows.
 
-**New Utility: `utils/googleDriveUtils.ts`**
-- `uploadToGoogleDrive(file: File, folderId: string, accessToken: string)`:
-  - Uses `POST https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`.
-  - Metadata: `{ name: file.name, parents: [folderId] }`.
-  - Body: Multipart (Metadata + File Content).
-  - Returns: Google Drive File Object (id, name, webViewLink, webContentLink).
+### Step 3: The Scale (Team)
+*   **Question:** "Who is on your team?"
+*   **Option A: "Just me (Solo)"**
+    *   *Action:* Hide "Team" photo views, simplify "Payroll" to "Personal Earnings". Hide "Internal Transfers".
+*   **Option B: "Me + Assistants/Freelancers"**
+    *   *Action:* Enable "Team" view but focus on contractor payouts.
+*   **Option C: "Full Team (Admins, Editors, Photographers)"**
+    *   *Action:* Enable full RBAC (Role Based Access Control) and Shift Scheduling.
 
-### 3. Refactor `ProjectFiles.tsx`
-Modify the `handleUploadToStorage` function.
+### Step 4: The Aesthetics (Vibe)
+*   **Question:** "Pick your dashboard style."
+*   **Choices:**
+    *   *Professional (Dark/Monochrome)* - Default.
+    *   *Playful (Pastels)* - Good for baby/family photographers.
+    *   *High-End (Serif fonts, Minimalist)* - Good for fashion/wedding.
+*   *Action:* Sets a `theme` config that adjusts font-family and primary accent colors globally.
 
-- **Check Connection**: Ensure User has Google connected (`currentUser.isGoogleConnected` or check if we have a token).
-- **Check Folder**: Ensure `booking.driveFolderId` exists. If not, prompt user to "Link Drive Folder" first.
-- **Upload Flow**:
-  1.  Retrieve `accessToken` (might need to refresh if expired - see `googleIntegration` logic).
-      - *Note*: `googleIntegration.ts` stores tokens in Firestore. We might need a cloud function or a client-side fetch to get a fresh token if the client doesn't have it handy. `ProjectDrivePicker` accepts `googleToken` as a prop, suggesting the parent component holds it.
-  2.  Call `uploadToGoogleDrive`.
-  3.  On success, construct a `BookingFile` object:
-      ```typescript
-      {
-        id: driveFile.id,
-        name: driveFile.name,
-        url: driveFile.webViewLink, // Link to Drive
-        type: 'DELIVERABLE', // or 'DRIVE_FILE'
-        uploadedAt: new Date().toISOString(),
-        source: 'GOOGLE_DRIVE' // New field to distinguish
-      }
-      ```
-  4.  Update Firestore via `onUpdateBooking`.
+---
 
-### 4. Token Management
-- `ProjectFiles` needs access to the Google Access Token.
-- Currently `AuthContext` or `StudioContext` might need to expose this, or we fetch it when the component mounts if the user is connected.
-- *Action*: Check where `googleToken` comes from in `ProjectDrivePicker` usage (likely `ProjectDrawer.tsx` or `ProjectDrivePicker` parent).
+## Phase 2: Adaptive UI/UX Strategies
 
-### 5. Cleanup
-- Remove usage of `uploadFile` (Firebase Storage) from `ProjectFiles.tsx` once Drive upload is working.
-- Optionally, allow users to migrate existing files (out of scope for now, focus on new uploads).
+### 1. The Adaptive Sidebar
+The Sidebar should not show 10 items for a user who needs 3.
+*   **Freelancer Mode:**
+    *   *Hide:* "Production" (Rename to "Projects"), "Inventory" (Move to Settings or lower priority), "Team".
+    *   *Highlight:* "Calendar", "Invoices", "Public Site".
+*   **Studio Mode:**
+    *   *Highlight:* "Calendar" (Room View), "Inventory" (Asset Tracking), "Team".
 
-## User Experience
-1. User opens Project -> Files.
-2. If no folder linked -> "Link Google Drive Folder" (opens Picker).
-3. User selects/creates folder.
-4. "Upload File" button becomes active.
-5. User selects file -> Uploads to Drive -> Appears in list.
-6. Clicking file opens Google Drive viewer.
+### 2. Dashboard Personalization
+*   **For Freelancers:**
+    *   **Focus:** "Next Shoot", "Pending Edits", "Recent Inquiries".
+    *   **Visual:** Large hero card for the very next event.
+*   **For Studio Owners:**
+    *   **Focus:** "Room Utilization Today", "Staff Checked In", "Equipment Out".
+    *   **Visual:** A timeline/gantt chart of the day's room bookings.
 
-## Potential Issues & Solutions
-- **Scope**: `drive.file` only allows access to files created by the app.
-  - *Mitigation*: The "Link Folder" flow must ensure the app "knows" about the folder. If the user picks a folder via our custom `ProjectDrivePicker` (which uses the API with the same token), the app *should* be able to write to it if the token is valid.
-- **CORS**: Google Drive API supports CORS for uploads.
+### 3. Terminology "Swapping"
+We will implement a `TranslationContext` or simple string helper that checks `config.type`.
+*   *If Freelancer:* "Booking" -> "Shoot", "Studio Rooms" -> "Locations".
+*   *If Studio:* "Booking" -> "Session/Rental", "Studio Rooms" -> "Studios".
 
-## Tasks
-1.  [x] Create `utils/googleDriveUtils.ts` for upload logic.
-2.  [x] Update `ProjectFiles.tsx` to accept `googleToken` and `driveFolderId`.
-3.  [x] Implement the new upload handler.
-4.  [x] Test with a real Google Account.
+---
+
+## Phase 3: Technical Implementation Plan
+
+### 1. Data Structure Updates (`types.ts`)
+Update `StudioConfig` to include:
+```typescript
+interface StudioConfig {
+  // ... existing
+  businessType: 'FREELANCE' | 'STUDIO' | 'AGENCY';
+  teamSize: 'SOLO' | 'SMALL' | 'LARGE';
+  visualTheme: 'MODERN' | 'CLASSIC' | 'PLAYFUL';
+  featureFlags: {
+      enableInventory: boolean;
+      enableTeam: boolean;
+      enableProduction: boolean;
+      enableRooms: boolean;
+  }
+}
+```
+
+### 2. Onboarding Logic (`OnboardingView.tsx`)
+*   Refactor the step state machine to handle the branching logic.
+*   The "Loading" phase (Step 6) will now compute the `featureFlags` based on the answers provided in Steps 2 & 3.
+
+### 3. Component Adaptation
+*   **`Sidebar.tsx`**: Wrap menu items in a check: `{config.featureFlags.enableInventory && <InventoryLink />}`.
+*   **`DashboardView.tsx`**: Create two internal components: `<FreelancerDashboard />` and `<StudioDashboard />` and render based on `config.businessType`.
+
+---
+
+## Phase 4: Long-term "Smart" Improvements
+
+### 1. "Grow with you" Features
+*   If a Solo user adds a second user in Settings, the system prompts: "Looks like you're growing! Should we enable Team Management features?"
+
+### 2. Context-Aware Mobile App (Responsive)
+*   **On Mobile:**
+    *   *Freelancer:* Opens directly to "Schedule" or "QR Code for Payment".
+    *   *Studio Manager:* Opens to "Today's Overview" (Who is in what room).
+
+### 3. Industry Templates
+*   **Wedding:** Pre-filled packages (Engagement, Day-of), Contract templates with wedding specific clauses.
+*   **Commercial:** Invoices set to Net-30 by default, "Usage Rights" fields enabled in Contracts.

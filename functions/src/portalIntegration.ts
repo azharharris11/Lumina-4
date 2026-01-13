@@ -3,6 +3,7 @@ import { onCall, HttpsError, onRequest } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import { getFirestore } from "firebase-admin/firestore";
 import { google } from "googleapis";
+import archiver from "archiver";
 import { getAuthenticatedClient, googleClientId, googleClientSecret, googleRedirectUri } from "./googleIntegration";
 
 /**
@@ -79,7 +80,8 @@ export const getPortalFiles = onCall({
         id: f.id,
         name: f.name,
         mimeType: f.mimeType,
-        thumbnail: f.thumbnailLink,
+        // FIX: Force High-Res Thumbnail
+        thumbnail: f.thumbnailLink ? f.thumbnailLink.replace(/=s\d+/, "=s1600") : undefined,
         // Use Proxy URL instead of webContentLink
         downloadUrl: `${proxyBaseUrl}?fileId=${f.id}&bookingId=${bookingId}`,
         viewUrl: f.webViewLink,
@@ -142,7 +144,9 @@ export const proxyDriveDownload = onRequest({
     const meta = await drive.files.get({ fileId, fields: "name,mimeType,size" });
 
     res.setHeader("Content-Type", meta.data.mimeType || "application/octet-stream");
-    res.setHeader("Content-Disposition", `attachment; filename="${meta.data.name}"`);
+    // FIX: Handle special characters in filename safely
+    res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(meta.data.name || "file")}`);
+
     if (meta.data.size) res.setHeader("Content-Length", meta.data.size);
 
     const response = await drive.files.get(
@@ -162,5 +166,114 @@ export const proxyDriveDownload = onRequest({
   } catch (error: any) {
     logger.error("Proxy Download Error", error);
     res.status(500).send("Download failed");
+  }
+});
+
+/**
+ * Downloads all files from the booking folder as a ZIP archive.
+ */
+export const downloadGalleryZip = onRequest({
+  secrets: [googleClientId, googleClientSecret, googleRedirectUri],
+  cors: true,
+}, async (req, res) => {
+  const bookingId = req.query.bookingId as string;
+
+  if (!bookingId) {
+    res.status(400).send("Missing bookingId");
+    return;
+  }
+
+  const db = getFirestore();
+
+  try {
+    // 1. Verify Booking
+    const bookingSnap = await db.collection("bookings").doc(bookingId).get();
+    if (!bookingSnap.exists) {
+      res.status(404).send("Booking not found");
+      return;
+    }
+
+    const booking = bookingSnap.data();
+    if (!booking?.driveFolderId) {
+      res.status(404).send("No folder linked");
+      return;
+    }
+
+    const ownerId = booking.ownerId;
+
+    // 2. Auth Owner
+    const clientId = googleClientId.value();
+    const clientSecret = googleClientSecret.value();
+    const redirectUri = googleRedirectUri.value();
+
+    const oauthClient = await getAuthenticatedClient(ownerId, clientId, clientSecret, redirectUri);
+    if (!oauthClient) {
+      res.status(503).send("Owner Google Account disconnected");
+      return;
+    }
+
+    const drive = google.drive({ version: "v3", auth: oauthClient });
+
+    // 3. Set ZIP Headers
+    const filename = `Gallery-${booking.clientName.replace(/[^a-zA-Z0-9]/g, "_")}.zip`;
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+    // 4. Initialize Archiver
+    const archive = archiver("zip", {
+      zlib: { level: 9 }, // Sets the compression level.
+    });
+
+    // Good practice to catch warnings (ie stat failures and other non-blocking errors)
+    archive.on("warning", (err: any) => {
+      if (err.code === "ENOENT") {
+        logger.warn("Archiver warning", err);
+      } else {
+        throw err;
+      }
+    });
+
+    archive.on("error", (err: any) => {
+      throw err;
+    });
+
+    // Pipe archive data to the response
+    archive.pipe(res);
+
+    // 5. Fetch File List (Recursive or Flat?) - Flat for now
+    const query = `'${booking.driveFolderId}' in parents and trashed = false`;
+    const listRes = await drive.files.list({
+      q: query,
+      fields: "files(id, name, mimeType)",
+      pageSize: 100, // Limit to prevent timeout
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
+    });
+
+    const files = listRes.data.files || [];
+
+    // 6. Iterate and Append to Archive
+    for (const file of files) {
+      // Skip folders inside zip for now to avoid complexity
+      if (file.mimeType === "application/vnd.google-apps.folder") continue;
+
+      // Get Stream
+      const streamRes = await drive.files.get(
+        { fileId: file.id!, alt: "media" },
+        { responseType: "stream" }
+      );
+
+      archive.append(streamRes.data, { name: file.name || "file" });
+    }
+
+    // 7. Finalize
+    await archive.finalize();
+  } catch (error: any) {
+    logger.error("ZIP Download Error", error);
+    if (!res.headersSent) {
+      res.status(500).send("Failed to create zip archive");
+    } else {
+      res.end(); // End valid stream if error mid-stream
+    }
   }
 });
