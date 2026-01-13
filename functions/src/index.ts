@@ -13,12 +13,12 @@ const db = getFirestore();
 
 // Ethereal Email Configuration (For Testing Only)
 const transporter = nodemailer.createTransport({
-    host: 'smtp.ethereal.email',
-    port: 587,
-    auth: {
-        user: 'karelle.brakus@ethereal.email',
-        pass: '6G2QyYq2qQ2qQ2qQ2q' 
-    }
+  host: "smtp.ethereal.email",
+  port: 587,
+  auth: {
+    user: "karelle.brakus@ethereal.email",
+    pass: "6G2QyYq2qQ2qQ2qQ2q",
+  },
 });
 
 // Export Google Auth Functions
@@ -33,69 +33,69 @@ export { getGoogleAuthURL, googleAuthCallback, disconnectGoogle, getGoogleAccess
  * Goal: Aggregate financial data for the previous month and store in 'metrics'.
  */
 export const monthlyFinancialAggregator = onSchedule("0 1 1 * *", async (event) => {
-    const db = getFirestore();
-    const lastMonth = new Date();
-    lastMonth.setMonth(lastMonth.getMonth() - 1);
-    
-    const year = lastMonth.getFullYear();
-    const month = lastMonth.getMonth(); // 0-indexed
-    const monthLabel = lastMonth.toLocaleString('default', { month: 'short' });
-    const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const db = getFirestore();
+  const lastMonth = new Date();
+  lastMonth.setMonth(lastMonth.getMonth() - 1);
 
-    logger.info(`Running Monthly Aggregator for ${monthKey}`);
+  const year = lastMonth.getFullYear();
+  const month = lastMonth.getMonth(); // 0-indexed
+  const monthLabel = lastMonth.toLocaleString("default", { month: "short" });
+  const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
 
-    try {
-        // We need to do this for EACH owner (studio)
-        const studiosSnap = await db.collection("studios").get();
-        
-        for (const studioDoc of studiosSnap.docs) {
-            const ownerId = studioDoc.id;
-            
-            const startOfMonth = new Date(year, month, 1).toISOString();
-            const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
+  logger.info(`Running Monthly Aggregator for ${monthKey}`);
 
-            const transSnap = await db.collection("transactions")
-                .where("ownerId", "==", ownerId)
-                .where("date", ">=", startOfMonth)
-                .where("date", "<=", endOfMonth)
-                .get();
+  try {
+    // We need to do this for EACH owner (studio)
+    const studiosSnap = await db.collection("studios").get();
 
-            let revenue = 0;
-            let expenses = 0;
-            let bookingsCount = 0;
+    for (const studioDoc of studiosSnap.docs) {
+      const ownerId = studioDoc.id;
 
-            transSnap.forEach(doc => {
-                const t = doc.data();
-                if (t.type === "INCOME") revenue += t.amount;
-                if (t.type === "EXPENSE") expenses += t.amount;
-            });
+      const startOfMonth = new Date(year, month, 1).toISOString();
+      const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
 
-            const bookingsSnap = await db.collection("bookings")
-                .where("ownerId", "==", ownerId)
-                .where("date", ">=", startOfMonth)
-                .where("date", "<=", endOfMonth)
-                .where("status", "!=", "CANCELLED")
-                .get();
-            
-            bookingsCount = bookingsSnap.size;
+      const transSnap = await db.collection("transactions")
+        .where("ownerId", "==", ownerId)
+        .where("date", ">=", startOfMonth)
+        .where("date", "<=", endOfMonth)
+        .get();
 
-            const metric = {
-                id: monthKey,
-                month: monthLabel,
-                revenue,
-                expenses,
-                profit: revenue - expenses,
-                bookings: bookingsCount,
-                updatedAt: new Date().toISOString(),
-                ownerId
-            };
+      let revenue = 0;
+      let expenses = 0;
+      let bookingsCount = 0;
 
-            await db.collection("metrics").doc(`${ownerId}_${monthKey}`).set(metric);
-            logger.info(`Metric saved for studio ${ownerId}: ${monthKey}`);
-        }
-    } catch (error) {
-        logger.error("Monthly Aggregator Failed", error);
+      transSnap.forEach((doc) => {
+        const t = doc.data();
+        if (t.type === "INCOME") revenue += t.amount;
+        if (t.type === "EXPENSE") expenses += t.amount;
+      });
+
+      const bookingsSnap = await db.collection("bookings")
+        .where("ownerId", "==", ownerId)
+        .where("date", ">=", startOfMonth)
+        .where("date", "<=", endOfMonth)
+        .where("status", "!=", "CANCELLED")
+        .get();
+
+      bookingsCount = bookingsSnap.size;
+
+      const metric = {
+        id: monthKey,
+        month: monthLabel,
+        revenue,
+        expenses,
+        profit: revenue - expenses,
+        bookings: bookingsCount,
+        updatedAt: new Date().toISOString(),
+        ownerId,
+      };
+
+      await db.collection("metrics").doc(`${ownerId}_${monthKey}`).set(metric);
+      logger.info(`Metric saved for studio ${ownerId}: ${monthKey}`);
     }
+  } catch (error) {
+    logger.error("Monthly Aggregator Failed", error);
+  }
 });
 
 /**
@@ -103,17 +103,17 @@ export const monthlyFinancialAggregator = onSchedule("0 1 1 * *", async (event) 
  * Goal: Send emergency email for ratings <= 3.
  */
 export const onNegativeFeedback = onDocumentCreated("internal_reviews/{reviewId}", async (event) => {
-    const review = event.data?.data();
-    if (!review || review.rating > 3) return;
+  const review = event.data?.data();
+  if (!review || review.rating > 3) return;
 
-    const db = getFirestore();
-    try {
-        const ownerSnap = await db.collection("users").doc(review.ownerId).get();
-        const ownerEmail = ownerSnap.data()?.email;
+  const db = getFirestore();
+  try {
+    const ownerSnap = await db.collection("users").doc(review.ownerId).get();
+    const ownerEmail = ownerSnap.data()?.email;
 
-        if (ownerEmail) {
-            const subject = `[URGENT] Negative Feedback from ${review.clientName}`;
-            const html = `
+    if (ownerEmail) {
+      const subject = `[URGENT] Negative Feedback from ${review.clientName}`;
+      const html = `
                 <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 2px solid #f43f5e; border-radius: 10px;">
                     <h2 style="color: #f43f5e;">Alert: Low Rating Received</h2>
                     <p>Your client <strong>${review.clientName}</strong> has just submitted a <strong>${review.rating}-star</strong> review.</p>
@@ -126,51 +126,51 @@ export const onNegativeFeedback = onDocumentCreated("internal_reviews/{reviewId}
                 </div>
             `;
 
-            await transporter.sendMail({
-                from: '"Lumina Emergency" <emergency@lumina.id>',
-                to: ownerEmail,
-                subject: subject,
-                html: html,
-            });
+      await transporter.sendMail({
+        from: "\"Lumina Emergency\" <emergency@lumina.id>",
+        to: ownerEmail,
+        subject: subject,
+        html: html,
+      });
 
-            logger.info(`Emergency feedback email sent to ${ownerEmail}`);
-        }
-    } catch (error) {
-        logger.error("Failed to send emergency feedback email", error);
+      logger.info(`Emergency feedback email sent to ${ownerEmail}`);
     }
+  } catch (error) {
+    logger.error("Failed to send emergency feedback email", error);
+  }
 });
 
 export const dailyReminderCron = onSchedule("0 8 * * *", async (event) => {
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().split("T")[0];
 
-    logger.info(`Running Daily Reminders for ${tomorrowStr}`);
+  logger.info(`Running Daily Reminders for ${tomorrowStr}`);
 
-    try {
-        const bookingsRef = db.collection("bookings");
-        const snapshot = await bookingsRef
-            .where("date", "==", tomorrowStr)
-            .where("status", "in", ["BOOKED", "INQUIRY"])
-            .get();
+  try {
+    const bookingsRef = db.collection("bookings");
+    const snapshot = await bookingsRef
+      .where("date", "==", tomorrowStr)
+      .where("status", "in", ["BOOKED", "INQUIRY"])
+      .get();
 
-        if (snapshot.empty) {
-            logger.info("No bookings scheduled for tomorrow.");
-            return;
-        }
+    if (snapshot.empty) {
+      logger.info("No bookings scheduled for tomorrow.");
+      return;
+    }
 
-        for (const doc of snapshot.docs) {
-            const booking = doc.data();
-            
-            // Send Email to Client (Mocking client email as it's not always in booking, 
-            // but in real app we'd fetch it from the 'clients' collection)
-            const clientSnap = await db.collection("clients").doc(booking.clientId).get();
-            const clientEmail = clientSnap.data()?.email;
+    for (const doc of snapshot.docs) {
+      const booking = doc.data();
 
-            if (clientEmail) {
-                const subject = `Reminder: Your Photo Session Tomorrow!`;
-                const html = `
+      // Send Email to Client (Mocking client email as it's not always in booking,
+      // but in real app we'd fetch it from the 'clients' collection)
+      const clientSnap = await db.collection("clients").doc(booking.clientId).get();
+      const clientEmail = clientSnap.data()?.email;
+
+      if (clientEmail) {
+        const subject = "Reminder: Your Photo Session Tomorrow!";
+        const html = `
                     <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
                         <h2 style="color: #2563eb;">See you tomorrow!</h2>
                         <p>Hi ${booking.clientName},</p>
@@ -185,19 +185,19 @@ export const dailyReminderCron = onSchedule("0 8 * * *", async (event) => {
                     </div>
                 `;
 
-                await transporter.sendMail({
-                    from: '"Lumina System" <system@lumina.id>',
-                    to: clientEmail,
-                    subject: subject,
-                    html: html,
-                });
+        await transporter.sendMail({
+          from: "\"Lumina System\" <system@lumina.id>",
+          to: clientEmail,
+          subject: subject,
+          html: html,
+        });
 
-                logger.info(`Reminder sent to ${clientEmail} for booking ${doc.id}`);
-            }
-        }
-    } catch (error) {
-        logger.error("Failed to process daily reminders", error);
+        logger.info(`Reminder sent to ${clientEmail} for booking ${doc.id}`);
+      }
     }
+  } catch (error) {
+    logger.error("Failed to process daily reminders", error);
+  }
 });
 
 export const sendBookingNotification = onDocumentCreated("bookings/{bookingId}", async (event) => {
@@ -214,12 +214,12 @@ export const sendBookingNotification = onDocumentCreated("bookings/{bookingId}",
 
   try {
     // 1. Get Owner Email (to notify the studio owner)
-    const userDoc = await db.collection('users').doc(booking.ownerId).get();
+    const userDoc = await db.collection("users").doc(booking.ownerId).get();
     const ownerEmail = userDoc.data()?.email;
 
     if (!ownerEmail) {
-        logger.warn(`No email found for owner ${booking.ownerId}. Skipping notification.`);
-        return;
+      logger.warn(`No email found for owner ${booking.ownerId}. Skipping notification.`);
+      return;
     }
 
     const subject = `New Booking: ${booking.clientName} - ${booking.package}`;
@@ -240,14 +240,13 @@ export const sendBookingNotification = onDocumentCreated("bookings/{bookingId}",
 
     // Send Email
     await transporter.sendMail({
-        from: '"Lumina System" <system@lumina.id>',
-        to: ownerEmail,
-        subject: subject,
-        html: html,
+      from: "\"Lumina System\" <system@lumina.id>",
+      to: ownerEmail,
+      subject: subject,
+      html: html,
     });
 
     logger.info(`Email notification sent to ${ownerEmail} for booking ${bookingId}`);
-
   } catch (error) {
     logger.error("Failed to send notification email", error);
   }

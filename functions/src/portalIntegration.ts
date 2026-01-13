@@ -12,12 +12,12 @@ import { getAuthenticatedClient, googleClientId, googleClientSecret, googleRedir
 // Ethereal Email Configuration (For Testing Only)
 // In production, replace with SendGrid, Mailgun, or your actual SMTP provider
 const transporter = nodemailer.createTransport({
-    host: 'smtp.ethereal.email',
-    port: 587,
-    auth: {
-        user: 'karelle.brakus@ethereal.email',
-        pass: '6G2QyYq2qQ2qQ2qQ2q' 
-    }
+  host: "smtp.ethereal.email",
+  port: 587,
+  auth: {
+    user: "karelle.brakus@ethereal.email",
+    pass: "6G2QyYq2qQ2qQ2qQ2q",
+  },
 });
 
 /**
@@ -110,40 +110,40 @@ export const proxyWatermarkedImage = onRequest({
  * Goal: Detect when a client confirms their selection and notify the photographer.
  */
 export const onBookingUpdate = onDocumentUpdated("bookings/{bookingId}", async (event) => {
-    const before = event.data?.before.data();
-    const after = event.data?.after.data();
+  const before = event.data?.before.data();
+  const after = event.data?.after.data();
 
-    if (!before || !after) return;
+  if (!before || !after) return;
 
-    // Check if selectionSubmitted changed from false (or undefined) to true
-    if (!before.selectionSubmitted && after.selectionSubmitted) {
-        const db = getFirestore();
-        const booking = after;
-        
-        try {
-            // 1. Create In-App Notification
-            const notification = {
-                id: `n-sel-${Date.now()}`,
-                title: "Selection Confirmed",
-                message: `${booking.clientName} has finalized their photo selection.`,
-                time: new Date().toISOString(),
-                read: false,
-                type: "SUCCESS",
-                link: "dashboard",
-                ownerId: booking.ownerId
-            };
+  // Check if selectionSubmitted changed from false (or undefined) to true
+  if (!before.selectionSubmitted && after.selectionSubmitted) {
+    const db = getFirestore();
+    const booking = after;
 
-            await db.collection("notifications").add(notification);
+    try {
+      // 1. Create In-App Notification
+      const notification = {
+        id: `n-sel-${Date.now()}`,
+        title: "Selection Confirmed",
+        message: `${booking.clientName} has finalized their photo selection.`,
+        time: new Date().toISOString(),
+        read: false,
+        type: "SUCCESS",
+        link: "dashboard",
+        ownerId: booking.ownerId,
+      };
 
-            // 2. Fetch Owner Email
-            const ownerSnap = await db.collection("users").doc(booking.ownerId).get();
-            const ownerData = ownerSnap.data();
-            const ownerEmail = ownerData?.email;
+      await db.collection("notifications").add(notification);
 
-            if (ownerEmail) {
-                // 3. Send Email Notification
-                const subject = `Selection Confirmed: ${booking.clientName}`;
-                const html = `
+      // 2. Fetch Owner Email
+      const ownerSnap = await db.collection("users").doc(booking.ownerId).get();
+      const ownerData = ownerSnap.data();
+      const ownerEmail = ownerData?.email;
+
+      if (ownerEmail) {
+        // 3. Send Email Notification
+        const subject = `Selection Confirmed: ${booking.clientName}`;
+        const html = `
                     <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
                         <h2 style="color: #10b981;">Selection Finalized!</h2>
                         <p>Hi there,</p>
@@ -158,24 +158,23 @@ export const onBookingUpdate = onDocumentUpdated("bookings/{bookingId}", async (
                     </div>
                 `;
 
-                await transporter.sendMail({
-                    from: '"Lumina System" <system@lumina.id>',
-                    to: ownerEmail,
-                    subject: subject,
-                    html: html,
-                });
+        await transporter.sendMail({
+          from: "\"Lumina System\" <system@lumina.id>",
+          to: ownerEmail,
+          subject: subject,
+          html: html,
+        });
 
-                logger.info(`[Email] Notification sent to ${ownerEmail} for Booking ${event.params.bookingId}.`);
-            } else {
-                logger.warn(`[Email] Could not find email for Owner ${booking.ownerId}. Skipping email notification.`);
-            }
+        logger.info(`[Email] Notification sent to ${ownerEmail} for Booking ${event.params.bookingId}.`);
+      } else {
+        logger.warn(`[Email] Could not find email for Owner ${booking.ownerId}. Skipping email notification.`);
+      }
 
-            logger.info(`[Notification] Selection confirmed for Booking ${event.params.bookingId}. Notification created.`);
-
-        } catch (error) {
-            logger.error("Failed to process booking update trigger", error);
-        }
+      logger.info(`[Notification] Selection confirmed for Booking ${event.params.bookingId}. Notification created.`);
+    } catch (error) {
+      logger.error("Failed to process booking update trigger", error);
     }
+  }
 });
 
 /**
@@ -432,9 +431,9 @@ export const downloadGalleryZip = onRequest({
     const filesToZip = allFiles.slice(startIndex, endIndex);
 
     if (filesToZip.length === 0) {
-       // Handle empty range
-       archive.finalize();
-       return;
+      // Handle empty range
+      archive.finalize();
+      return;
     }
 
     // 6. Iterate and Append to Archive
@@ -445,13 +444,13 @@ export const downloadGalleryZip = onRequest({
       // Get Stream
       try {
         const streamRes = await drive.files.get(
-            { fileId: file.id!, alt: "media" },
-            { responseType: "stream" }
+          { fileId: file.id!, alt: "media" },
+          { responseType: "stream" }
         );
         archive.append(streamRes.data, { name: file.name || "file" });
       } catch (err) {
-          logger.warn(`Failed to download file ${file.id}`, err);
-          // Continue zipping others
+        logger.warn(`Failed to download file ${file.id}`, err);
+        // Continue zipping others
       }
     }
 

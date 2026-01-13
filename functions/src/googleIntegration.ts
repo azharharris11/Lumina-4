@@ -23,6 +23,7 @@ function createOAuthClient() {
 
 /**
  * Internal helper to register a Google Calendar Watch channel.
+ * @param {string} userId - The ID of the user.
  */
 async function performCalendarWatch(userId: string) {
   const db = getFirestore();
@@ -39,7 +40,7 @@ async function performCalendarWatch(userId: string) {
   const calendar = google.calendar({version: "v3", auth});
   const channelId = `lumina-cal-${userId}-${Date.now()}`;
   const projectId = process.env.GCLOUD_PROJECT;
-  const region = "us-central1"; 
+  const region = "us-central1";
   // Ensure the URL is correct for your deployed functions
   const webhookUrl = `https://${region}-${projectId}.cloudfunctions.net/handleCalendarWebhook`;
 
@@ -116,14 +117,14 @@ export const handleCalendarWebhook = onRequest({
     }
 
     const calendar = google.calendar({ version: "v3", auth });
-    
+
     // Fetch recently updated events (including deleted ones to handle cancellations)
     const listRes = await calendar.events.list({
       calendarId: "primary",
       orderBy: "updated",
       maxResults: 20,
       showDeleted: true, // IMPORTANT: Now showing deleted
-      singleEvents: true
+      singleEvents: true,
     });
 
     const events = listRes.data.items || [];
@@ -142,15 +143,15 @@ export const handleCalendarWebhook = onRequest({
 
       // 1. Handle Deletion (Cancellation)
       if (event.status === "cancelled") {
-          if (booking.status !== "CANCELLED") {
-              await bookingRef.update({
-                  status: "CANCELLED",
-                  updatedBy: "GOOGLE_CALENDAR_SYNC",
-                  notes: (booking.notes || "") + "\n[System] Cancelled via Google Calendar."
-              });
-              logger.info(`Booking ${bookingId} CANCELLED via Google Calendar Sync.`);
-          }
-          continue;
+        if (booking.status !== "CANCELLED") {
+          await bookingRef.update({
+            status: "CANCELLED",
+            updatedBy: "GOOGLE_CALENDAR_SYNC",
+            notes: (booking.notes || "") + "\n[System] Cancelled via Google Calendar.",
+          });
+          logger.info(`Booking ${bookingId} CANCELLED via Google Calendar Sync.`);
+        }
+        continue;
       }
 
       // 2. Handle Reschedule
@@ -163,7 +164,7 @@ export const handleCalendarWebhook = onRequest({
           await bookingRef.update({
             date: newDate,
             timeStart: newTime,
-            updatedBy: "GOOGLE_CALENDAR_SYNC"
+            updatedBy: "GOOGLE_CALENDAR_SYNC",
           });
           logger.info(`Updated Booking ${bookingId} from Google Calendar Change: ${newDate} @ ${newTime}`);
         }
@@ -206,7 +207,7 @@ export const disconnectGoogle = onCall({
     }
 
     // Optional: Stop the watch channel on Google side if we have channelId/resourceId stored
-    
+
     // 1. Delete the auth document
     await docRef.delete();
 
@@ -241,7 +242,7 @@ export const getGoogleAuthURL = onCall({
     access_type: "offline",
     scope: scopes,
     state: request.auth.uid,
-    prompt: "consent", 
+    prompt: "consent",
     include_granted_scopes: true,
   });
 
@@ -280,10 +281,10 @@ export const googleAuthCallback = onRequest({secrets: [googleClientId, googleCli
 
     // --- AUTOMATION: Register Calendar Webhook Immediately ---
     try {
-        await performCalendarWatch(userId);
+      await performCalendarWatch(userId);
     } catch (watchError) {
-        logger.error(`Automatic watch registration failed for ${userId}`, watchError);
-        // We don't fail the whole callback, user is at least connected.
+      logger.error(`Automatic watch registration failed for ${userId}`, watchError);
+      // We don't fail the whole callback, user is at least connected.
     }
 
     res.send(`
@@ -435,7 +436,7 @@ export const renameDriveFile = onCall({
     const drive = google.drive({ version: "v3", auth });
     await drive.files.update({
       fileId,
-      requestBody: { name: newName }
+      requestBody: { name: newName },
     });
     return { success: true };
   } catch (error: any) {
