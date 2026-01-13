@@ -551,7 +551,22 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const batch = writeBatch(db);
 
       const userRef = doc(db, "users", ownerId);
-      batch.update(userRef, { hasCompletedOnboarding: true, studioFocus: data.focus, studioName: data.studioName });
+      
+      // Fix: Use set with merge instead of update to handle missing documents
+      const userPayload = {
+          uid: currentUser.id,
+          name: currentUser.name,
+          email: currentUser.email,
+          role: currentUser.role || 'OWNER',
+          avatar: currentUser.avatar || '',
+          phone: currentUser.phone || '',
+          status: currentUser.status || 'ACTIVE',
+          hasCompletedOnboarding: true, 
+          studioFocus: data.focus, 
+          studioName: data.studioName
+      };
+
+      batch.set(userRef, userPayload, { merge: true });
 
       const accId = `acc-${Date.now()}`;
       const newAccount: Account = { id: accId, name: data.bankDetails.name || 'Main Bank', type: 'BANK', balance: 0, accountNumber: data.bankDetails.number, ownerId };
