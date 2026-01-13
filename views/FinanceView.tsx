@@ -69,7 +69,24 @@ const FinanceView: React.FC<FinanceViewProps> = ({ accounts, metrics, bookings, 
       }
   };
 
-    const downloadAnchorNode = document.createElement('a'); 
+  const handleExportData = () => { 
+      try { 
+          const seen = new WeakSet();
+          const replacer = (key: string, value: any) => {
+              if (typeof value === 'object' && value !== null) {
+                  if (seen.has(value)) {
+                      return;
+                  }
+                  seen.add(value);
+              }
+              if (key === 'firestore' || key === '_key' || key === 'app' || key === 'delegate' || key.startsWith('_')) {
+                  return undefined;
+              }
+              return value;
+          };
+          const dataToExport = { config: config, packages: [] /* Placeholder if needed */, timestamp: new Date().toISOString() }; 
+          const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dataToExport, replacer)); 
+          const downloadAnchorNode = document.createElement('a'); 
           downloadAnchorNode.setAttribute("href", dataStr); 
           downloadAnchorNode.setAttribute("download", "lumina_backup.json"); 
           document.body.appendChild(downloadAnchorNode); 

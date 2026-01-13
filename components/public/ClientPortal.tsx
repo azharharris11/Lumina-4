@@ -388,13 +388,6 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
     // Filter selected photos for the "Selected" tab
     const selectedPhotos = proofingData.filter(p => p.selected);
 
-    return (
-        <div className="min-h-screen text-white font-sans pb-20 relative" style={{ backgroundColor: bgColor }}>
-            {/* Dynamic Background Layer */}
-            {config.portalBackgroundUrl && (
-                <div className="fixed inset-0 z-0 opacity-20 pointer-events-none" style={{ backgroundImage: bgImage, backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
-            )}
-
     // Navigation Tabs Configuration
     const navTabs = [
         { id: 'DASHBOARD', icon: LayoutDashboard, label: 'Dashboard' },
