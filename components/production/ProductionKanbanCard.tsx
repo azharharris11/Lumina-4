@@ -33,12 +33,11 @@ const ProductionKanbanCard: React.FC<ProductionKanbanCardProps> = ({ booking, cu
             exit={{ opacity: 0, scale: 0.95 }}
             className="w-full"
         >
-            <button
-                type="button"
-                draggable
-                onDragStart={(e: any) => onDragStart(e, booking.id)}
+            <div
+                draggable="true"
+                onDragStart={(e) => onDragStart(e as any, booking.id)}
                 onClick={() => onSelect(booking.id)}
-                className="w-full text-left bg-lumina-base border border-lumina-highlight p-2.5 md:p-3 rounded-xl shadow-sm hover:border-lumina-accent/50 cursor-grab active:cursor-grabbing group relative overflow-hidden transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-lumina-accent active:scale-[0.98]"
+                className="w-full text-left bg-lumina-base border border-lumina-highlight p-2.5 md:p-3 rounded-xl shadow-sm hover:border-lumina-accent/50 cursor-grab active:cursor-grabbing group relative overflow-hidden transition-all focus:outline-none active:scale-[0.98]"
             >
                 {/* Visual Accent */}
                 <div className={`absolute left-0 top-0 bottom-0 w-1 ${getDeadlineColor(booking.date).split(' ')[0].replace('text-', 'bg-')}`} />

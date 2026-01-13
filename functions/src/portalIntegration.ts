@@ -86,22 +86,25 @@ export const proxyWatermarkedImage = onRequest({
     res.setHeader("Content-Type", "image/jpeg");
     res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 24h
 
-    const pipeline = sharp();
-
-    pipeline
+    const transformer = sharp()
       .resize(1200, 1200, { fit: "inside", withoutEnlargement: true })
       .composite([{
         input: watermarkBuffer,
         gravity: "center",
         tile: true,
       }])
-      .jpeg({ quality: 75 })
-      .pipe(res);
+      .jpeg({ quality: 75 });
 
-    response.data.pipe(pipeline);
+    // Handle pipeline errors
+    transformer.on("error", (err) => {
+      logger.error("Sharp Processing Error:", err);
+      if (!res.headersSent) res.status(500).send("Processing Error");
+    });
+
+    response.data.pipe(transformer).pipe(res);
   } catch (error: any) {
-    logger.error("Watermark Proxy Error", error);
-    if (!res.headersSent) res.status(500).send("Failed to process image");
+    logger.error("Watermark Proxy Critical Error", error);
+    if (!res.headersSent) res.status(500).send("Internal Server Error");
   }
 });
 

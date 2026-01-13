@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* DEFAULT DARK THEME */
+  --base: 5 5 5;
+  --surface: 23 23 23;
+  --highlight: 38 38 38;
+  --text-main: 245 245 244;
+  --text-muted: 168 162 158;
+  --accent: 190 242 100;
+  --danger: 244 63 94;
+  --font-heading: 'Syne', sans-serif;
+  --font-body: 'Outfit', sans-serif;
+}
+
+.light-mode {
+  --base: 255 255 255;
+  --surface: 245 245 244;
+  --highlight: 214 211 209;
+  --text-main: 9 9 11;
+  --text-muted: 82 82 91;
+  --accent: 77 124 15;
+}
+
+body[data-theme='CLASSIC'] {
+  --font-heading: 'Playfair Display', serif;
+  --accent: 212 175 55;
+}
+
+body[data-theme='PLAYFUL'] {
+  --font-heading: 'Outfit', sans-serif;
+  --accent: 244 114 182;
+}
+
+body {
+  @apply bg-lumina-base text-lumina-text transition-colors duration-200;
+  font-family: var(--font-body);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+}
+
+.text-glow {
+  text-shadow: 0 0 20px rgba(var(--accent), 0.3);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgb(var(--base));
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--highlight));
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--text-muted));
+}
+
+/* Global Overrides */
+.light-mode .text-white {
+  color: rgb(var(--text-main)) !important;
+}
+
+.light-mode .text-real-white,
+.light-mode .bg-rose-500 .text-white,
+.light-mode .bg-emerald-500 .text-white,
+.light-mode .bg-blue-500 .text-white,
+.light-mode .bg-black .text-white,
+.light-mode .bg-stone-900 .text-white,
+.group:hover .group-hover\:text-white {
+  color: #ffffff !important;
+}

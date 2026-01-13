@@ -233,6 +233,25 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
         }
     };
 
+    const handleSubmitSelection = async () => {
+        const count = proofingData.filter(i => i.selected).length;
+        if (!confirm(`Are you sure you want to finalize your selection of ${count} photos? You won't be able to change this later.`)) return;
+
+        setIsSubmittingSelection(true);
+        try {
+            await updateDoc(doc(db, "bookings", booking.id), {
+                selectionSubmitted: true
+            });
+            // Update local state
+            setBooking(prev => ({ ...prev, selectionSubmitted: true }));
+            alert("Selection submitted successfully! We will proceed with editing.");
+        } catch (e) {
+            alert("Error submitting selection.");
+        } finally {
+            setIsSubmittingSelection(false);
+        }
+    };
+
     const handleSubmitFeedback = async () => {
         if (rating === 0) return;
 
