@@ -90,22 +90,22 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
         return proofingData.find(p => p.id === fileId)?.selected || false;
     };
 
-    const handleToggleHeart = async (file: DriveFile) => {
+    const handleToggleHeart = async (id: string, fileData?: { name: string, thumbnail: string }) => {
         if (booking.selectionSubmitted) return;
         
         // Check if item exists in proofingData
-        const existingIndex = proofingData.findIndex(p => p.id === file.id);
+        const existingIndex = proofingData.findIndex(p => p.id === id);
         let newData = [...proofingData];
 
         if (existingIndex >= 0) {
             // Toggle
             newData[existingIndex] = { ...newData[existingIndex], selected: !newData[existingIndex].selected };
-        } else {
-            // Add if missing (shouldn't happen if initialized, but safe fallback)
+        } else if (fileData) {
+            // Add if missing (only possible from Gallery tab)
             newData.push({
-                id: file.id,
-                filename: file.name,
-                thumbnail: file.thumbnail || '',
+                id: id,
+                filename: fileData.name,
+                thumbnail: fileData.thumbnail,
                 selected: true
             });
         }
@@ -204,7 +204,7 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
         }
     };
 
-    const handleToggleHeart = async (itemId: string) => {
+    const handleToggleHeartById = async (itemId: string) => {
         if (booking.selectionSubmitted) return;
 
         const newData = proofingData.map(item => 
@@ -587,7 +587,7 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
                                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-3">
                                             <div className="flex justify-end">
                                                 <button 
-                                                    onClick={(e) => { e.stopPropagation(); handleToggleHeart(file); }}
+                                                    onClick={(e) => { e.stopPropagation(); handleToggleHeart(file.id, { name: file.name, thumbnail: file.thumbnail || '' }); }}
                                                     className={`p-2 rounded-full shadow-md transition-transform hover:scale-110 ${isSelected(file.id) ? 'bg-rose-500 text-white' : 'bg-black/50 text-white hover:bg-rose-500'}`}
                                                     title={isSelected(file.id) ? "Unselect" : "Select Favorite"}
                                                 >
@@ -642,8 +642,7 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
                                                 className="bg-white/10 hover:bg-rose-500/20 hover:text-rose-500 text-white p-2 rounded-full transition-colors"
                                             >
                                                 <Eye size={20} className="hidden"/> {/* Placeholder for alignment */}
-                                                <X size={24} /> // Wait, X is not imported? I need to import X.
-                                                {/* Re-using Close logic */}
+                                                <X size={24} /> 
                                             </button>
                                         </div>
                                     </div>
@@ -662,7 +661,7 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
                                                 onClick={handlePrevImage}
                                                 className="absolute left-4 top-1/2 -translate-y-1/2 p-4 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-all"
                                             >
-                                                <ChevronLeft size={48} /> // Need import
+                                                <ChevronLeft size={48} /> 
                                             </button>
                                         )}
                                         {lightboxIndex < galleryFiles.length - 1 && (
@@ -670,7 +669,7 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
                                                 onClick={handleNextImage}
                                                 className="absolute right-4 top-1/2 -translate-y-1/2 p-4 text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-all"
                                             >
-                                                <ChevronRight size={48} /> // Need import
+                                                <ChevronRight size={48} /> 
                                             </button>
                                         )}
                                     </div>
@@ -678,7 +677,7 @@ const ClientPortal: React.FC<ClientPortalProps> = ({ booking: initialBooking, co
                                     {/* Bottom Toolbar */}
                                     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-4 z-50" onClick={e => e.stopPropagation()}>
                                         <button 
-                                            onClick={() => handleToggleHeart(galleryFiles[lightboxIndex])}
+                                            onClick={() => handleToggleHeart(galleryFiles[lightboxIndex].id, { name: galleryFiles[lightboxIndex].name, thumbnail: galleryFiles[lightboxIndex].thumbnail || '' })}
                                             className={`px-6 py-3 rounded-full font-bold flex items-center gap-2 shadow-xl transition-transform hover:scale-105
                                                 ${isSelected(galleryFiles[lightboxIndex].id) ? 'bg-rose-500 text-white' : 'bg-white text-black'}
                                             `}
