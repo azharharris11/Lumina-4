@@ -16,6 +16,8 @@ interface ProjectFilesProps {
 const ProjectFiles: React.FC<ProjectFilesProps> = ({ booking, currentUser, onUpdateBooking, createLocalLog, onOpenDrivePicker, googleToken }) => {
   const { addNotification } = useStudio(); // Use Context
   const [isUploading, setIsUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{current: number, total: number} | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isPaymentSettled = useMemo(() => {
@@ -35,7 +37,6 @@ const ProjectFiles: React.FC<ProjectFilesProps> = ({ booking, currentUser, onUpd
 
   const handleUploadClick = () => { 
       if (!booking.driveFolderId) {
-          // Alert is handled by UI logic below now, but keep as safe guard
           onOpenDrivePicker();
           return;
       }
@@ -46,56 +47,95 @@ const ProjectFiles: React.FC<ProjectFilesProps> = ({ booking, currentUser, onUpd
       fileInputRef.current?.click(); 
   };
 
-  const handleUploadToDrive = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files && e.target.files[0]) {
-          const file = e.target.files[0];
-          
-          if (!booking.driveFolderId) {
-            alert("No Google Drive folder linked.");
-            return;
-          }
-          if (!googleToken) {
-            alert("Missing Google Access Token.");
-            return;
+  const processUploads = async (files: FileList | File[]) => {
+      if (!files || files.length === 0) return;
+      
+      if (!booking.driveFolderId) {
+        alert("No Google Drive folder linked.");
+        return;
+      }
+      if (!googleToken) {
+        alert("Missing Google Access Token.");
+        return;
+      }
+
+      setIsUploading(true);
+      setUploadProgress({ current: 0, total: files.length });
+      
+      const newFiles: BookingFile[] = [];
+      const logs: ActivityLog[] = [];
+      let successCount = 0;
+
+      try {
+          // Process sequentially to avoid rate limiting or massive parallel bandwidth usage
+          for (let i = 0; i < files.length; i++) {
+              const file = files[i];
+              try {
+                  const driveFile = await uploadToGoogleDrive(file, booking.driveFolderId, googleToken);
+                  
+                  newFiles.push({
+                      id: driveFile.id,
+                      name: driveFile.name,
+                      url: driveFile.webViewLink,
+                      type: 'DELIVERABLE',
+                      uploadedAt: new Date().toISOString(),
+                      source: 'GOOGLE_DRIVE'
+                  });
+
+                  logs.push(createLocalLog('UPLOAD', `Uploaded: ${file.name}`));
+                  successCount++;
+              } catch (err) {
+                  console.error(`Failed to upload ${file.name}`, err);
+              }
+              setUploadProgress({ current: i + 1, total: files.length });
           }
 
-          setIsUploading(true);
-          try {
-              // Upload to Google Drive
-              const driveFile = await uploadToGoogleDrive(file, booking.driveFolderId, googleToken);
-              
-              const newFile: BookingFile = {
-                  id: driveFile.id,
-                  name: driveFile.name,
-                  url: driveFile.webViewLink,
-                  type: 'DELIVERABLE',
-                  uploadedAt: new Date().toISOString(),
-                  source: 'GOOGLE_DRIVE'
-              };
-
-              const updatedFiles = [...(booking.files || []), newFile];
-              
+          if (newFiles.length > 0) {
+              const updatedFiles = [...(booking.files || []), ...newFiles];
               onUpdateBooking({ 
                   ...booking, 
                   files: updatedFiles,
-                  logs: [createLocalLog('UPLOAD', `Uploaded to Drive: ${file.name}`), ...(booking.logs || [])]
+                  logs: [...logs, ...(booking.logs || [])]
               });
-
-              // Success Notification
+              
               addNotification({
                   type: 'SUCCESS',
                   title: 'Upload Complete',
-                  message: `${file.name} saved to Google Drive.`
+                  message: `${successCount} file(s) saved to Google Drive.`
               });
-
-          } catch (error) {
-              console.error("Drive Upload failed", error);
-              alert("Upload to Google Drive failed. Check console for details.");
-          } finally {
-              setIsUploading(false);
-              // Reset input
-              if (fileInputRef.current) fileInputRef.current.value = '';
+          } else {
+              alert("Failed to upload files. Check console.");
           }
+
+      } catch (error) {
+          console.error("Batch Upload Error", error);
+      } finally {
+          setIsUploading(false);
+          setUploadProgress(null);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files) {
+          processUploads(e.target.files);
+      }
+  };
+
+  // Drag and Drop Handlers
+  const onDragOver = (e: React.DragEvent) => {
+      e.preventDefault();
+      if (!isUploading && booking.driveFolderId) setIsDragging(true);
+  };
+  const onDragLeave = (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+  };
+  const onDrop = (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+      if (!isUploading && booking.driveFolderId && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          processUploads(e.dataTransfer.files);
       }
   };
 
@@ -197,8 +237,12 @@ const ProjectFiles: React.FC<ProjectFilesProps> = ({ booking, currentUser, onUpd
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div 
                     onClick={(!googleToken || !booking.driveFolderId) ? undefined : handleUploadClick}
-                    className={`p-4 border border-dashed border-lumina-highlight rounded-xl flex flex-col items-center justify-center text-center transition-colors bg-lumina-base/30 h-32 relative
-                        ${(!googleToken || !booking.driveFolderId) ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:border-lumina-accent/50 group'}
+                    onDragOver={onDragOver}
+                    onDragLeave={onDragLeave}
+                    onDrop={onDrop}
+                    className={`p-4 border border-dashed rounded-xl flex flex-col items-center justify-center text-center transition-all bg-lumina-base/30 h-32 relative
+                        ${(!googleToken || !booking.driveFolderId) ? 'border-lumina-highlight opacity-40 cursor-not-allowed' : 
+                          isDragging ? 'border-lumina-accent bg-lumina-accent/10 scale-[1.02]' : 'border-lumina-highlight cursor-pointer hover:border-lumina-accent/50 group'}
                         ${isUploading ? 'opacity-50 pointer-events-none' : ''}
                     `}
                 >
@@ -206,17 +250,23 @@ const ProjectFiles: React.FC<ProjectFilesProps> = ({ booking, currentUser, onUpd
                         type="file" 
                         ref={fileInputRef} 
                         className="hidden" 
-                        onChange={handleUploadToDrive} 
+                        multiple // Enabled Multiple
+                        onChange={handleFileChange} 
                     />
                     {isUploading ? (
-                        <Loader2 className="animate-spin text-lumina-accent mb-2" />
+                        <>
+                            <Loader2 className="animate-spin text-lumina-accent mb-2" />
+                            <p className="text-sm font-bold text-white">Uploading {uploadProgress?.current}/{uploadProgress?.total}...</p>
+                        </>
                     ) : (
-                        <Upload className="text-lumina-muted group-hover:text-white mb-2 transition-colors" />
+                        <>
+                            <Upload className={`mb-2 transition-colors ${isDragging ? 'text-lumina-accent' : 'text-lumina-muted group-hover:text-white'}`} />
+                            <p className="text-sm font-bold text-white">{isDragging ? 'Drop files here' : 'Upload to Drive'}</p>
+                            <p className="text-xs text-lumina-muted">
+                                {(!googleToken ? 'Connect Google Account First' : !booking.driveFolderId ? 'Link a Folder First' : 'Click or Drag & Drop multiple files')}
+                            </p>
+                        </>
                     )}
-                    <p className="text-sm font-bold text-white">{isUploading ? 'Uploading to Drive...' : 'Upload to Drive'}</p>
-                    <p className="text-xs text-lumina-muted">
-                        {isUploading ? 'Please wait' : (!googleToken ? 'Connect Google Account First' : !booking.driveFolderId ? 'Link a Folder First' : 'Files save to your Google Drive')}
-                    </p>
                 </div>
                 
                 <div className="p-4 bg-lumina-base border border-lumina-highlight rounded-xl relative overflow-hidden">

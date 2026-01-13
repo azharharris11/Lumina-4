@@ -11,9 +11,9 @@ initializeApp();
 const db = getFirestore();
 
 // Export Google Auth Functions
-import { getPortalFiles } from "./portalIntegration";
+import { getPortalFiles, proxyDriveDownload } from "./portalIntegration";
 
-export { getGoogleAuthURL, googleAuthCallback, disconnectGoogle, getGoogleAccessToken, getPortalFiles };
+export { getGoogleAuthURL, googleAuthCallback, disconnectGoogle, getGoogleAccessToken, getPortalFiles, proxyDriveDownload };
 
 // ... (existing imports and code)
 

@@ -1,5 +1,5 @@
 
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onCall, HttpsError, onRequest } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import { getFirestore } from "firebase-admin/firestore";
 import { google } from "googleapis";
@@ -42,11 +42,6 @@ export const getPortalFiles = onCall({
       return { files: [] }; // No folder linked yet
     }
 
-    // 3. Security: Check if client is allowed?
-    // Ideally we check if request.auth.uid matches booking.clientId or if it's a public portal access.
-    // For now, we assume public portal logic where having the Booking ID (and maybe a hash) is enough.
-    // We do strictly ensure we only look at the folderId linked to THIS booking.
-
     // 4. Authenticate as the Owner
     const clientId = googleClientId.value();
     const clientSecret = googleClientSecret.value();
@@ -74,6 +69,9 @@ export const getPortalFiles = onCall({
     });
 
     const files = res.data.files || [];
+    const projectId = process.env.GCLOUD_PROJECT;
+    const region = "us-central1"; // Standard Firebase region, hardcoded for now or derived
+    const proxyBaseUrl = `https://${region}-${projectId}.cloudfunctions.net/proxyDriveDownload`;
 
     // 6. Return Clean Data
     return {
@@ -82,7 +80,8 @@ export const getPortalFiles = onCall({
         name: f.name,
         mimeType: f.mimeType,
         thumbnail: f.thumbnailLink,
-        downloadUrl: f.webContentLink, // This forces download of original quality
+        // Use Proxy URL instead of webContentLink
+        downloadUrl: `${proxyBaseUrl}?fileId=${f.id}&bookingId=${bookingId}`,
         viewUrl: f.webViewLink,
         size: f.size,
         // Simple logic to detect if it's an image for the gallery
@@ -93,5 +92,75 @@ export const getPortalFiles = onCall({
     logger.error("Portal File Fetch Error", error);
     if (error instanceof HttpsError) throw error;
     throw new HttpsError("internal", "Failed to load gallery files.");
+  }
+});
+
+/**
+ * Proxy Function to stream Google Drive files to the client without
+ * requiring the client to have Google permissions.
+ */
+export const proxyDriveDownload = onRequest({
+  secrets: [googleClientId, googleClientSecret, googleRedirectUri],
+  cors: true,
+}, async (req, res) => {
+  const fileId = req.query.fileId as string;
+  const bookingId = req.query.bookingId as string;
+
+  if (!fileId || !bookingId) {
+    res.status(400).send("Missing fileId or bookingId");
+    return;
+  }
+
+  const db = getFirestore();
+
+  try {
+    // 1. Verify Booking (Security Check)
+    const bookingSnap = await db.collection("bookings").doc(bookingId).get();
+    if (!bookingSnap.exists) {
+      res.status(404).send("Booking not found");
+      return;
+    }
+
+    const booking = bookingSnap.data();
+    const ownerId = booking?.ownerId;
+
+    // 2. Auth Owner
+    const clientId = googleClientId.value();
+    const clientSecret = googleClientSecret.value();
+    const redirectUri = googleRedirectUri.value();
+
+    const oauthClient = await getAuthenticatedClient(ownerId, clientId, clientSecret, redirectUri);
+    if (!oauthClient) {
+      res.status(503).send("Owner Google Account disconnected");
+      return;
+    }
+
+    // 3. Stream File
+    const drive = google.drive({ version: "v3", auth: oauthClient });
+
+    // Get Metadata first for Content-Type and Filename
+    const meta = await drive.files.get({ fileId, fields: "name,mimeType,size" });
+
+    res.setHeader("Content-Type", meta.data.mimeType || "application/octet-stream");
+    res.setHeader("Content-Disposition", `attachment; filename="${meta.data.name}"`);
+    if (meta.data.size) res.setHeader("Content-Length", meta.data.size);
+
+    const response = await drive.files.get(
+      { fileId, alt: "media" },
+      { responseType: "stream" }
+    );
+
+    response.data
+      .on("end", () => {
+        res.end();
+      })
+      .on("error", (err) => {
+        logger.error("Stream Error", err);
+        res.status(500).end();
+      })
+      .pipe(res);
+  } catch (error: any) {
+    logger.error("Proxy Download Error", error);
+    res.status(500).send("Download failed");
   }
 });
