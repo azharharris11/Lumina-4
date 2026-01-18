@@ -24,7 +24,7 @@ const FeaturesBlock: React.FC<FeaturesBlockProps> = ({
     return (
         <section className={`py-20 px-6 max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-16 items-center ${className}`}>
             <div className={`bg-gray-50 aspect-[4/5] overflow-hidden ${imgOrder}`}>
-                {image && <img src={image} className="w-full h-full object-cover" alt="Feature" />}
+                {image && <img src={image} className="w-full h-full object-cover" alt="Feature" loading="lazy" />}
             </div>
             <div className={textOrder}>
                 <h2 className={`text-2xl font-medium mb-6 ${titleClassName}`}>{headline}</h2>

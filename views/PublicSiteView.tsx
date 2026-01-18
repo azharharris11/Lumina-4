@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { SiteConfig, Package, User, StudioConfig, PublicBookingSubmission, Booking } from '../types';
 import NoirTheme from '../components/site-builder/themes/NoirTheme';
 import EtherealTheme from '../components/site-builder/themes/EtherealTheme';
@@ -29,6 +29,86 @@ interface PublicSiteViewProps {
 
 const PublicSiteView: React.FC<PublicSiteViewProps> = ({ config, packages, users, bookings, portalBooking, isLoading, error, onBooking }) => {
     
+    // --- SEO & TRACKING EFFECT ---
+    useEffect(() => {
+        if (!config || !config.site) return;
+        
+        const site = config.site;
+        
+        // 1. Update Title
+        const originalTitle = document.title;
+        document.title = site.seo?.title || site.title || config.name || "Lumina Studio";
+        
+        // 2. Update Meta Description
+        let metaDescription = document.querySelector('meta[name="description"]');
+        if (!metaDescription) {
+            metaDescription = document.createElement('meta');
+            metaDescription.setAttribute('name', 'description');
+            document.head.appendChild(metaDescription);
+        }
+        const originalDescription = metaDescription.getAttribute('content');
+        metaDescription.setAttribute('content', site.seo?.description || site.description || "");
+
+        // 3. Update Favicon
+        const originalFavicon = (document.querySelector("link[rel~='icon']") as HTMLLinkElement)?.href;
+        if (site.branding?.faviconUrl) {
+            let link: HTMLLinkElement | null = document.querySelector("link[rel~='icon']");
+            if (!link) {
+                link = document.createElement('link');
+                link.rel = 'icon';
+                document.head.appendChild(link);
+            }
+            link.href = site.branding.faviconUrl;
+        }
+
+        // 4. Tracking - Google Analytics
+        if (site.pixels?.googleTagId && !window.location.hostname.includes('localhost')) {
+            const script1 = document.createElement('script');
+            script1.async = true;
+            script1.src = `https://www.googletagmanager.com/gtag/js?id=${site.pixels.googleTagId}`;
+            script1.id = 'ga-script-1';
+            document.head.appendChild(script1);
+
+            const script2 = document.createElement('script');
+            script2.id = 'ga-script-2';
+            script2.innerHTML = `
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', '${site.pixels.googleTagId}');
+            `;
+            document.head.appendChild(script2);
+        }
+
+        // 5. Tracking - Facebook Pixel
+        if (site.pixels?.facebookPixelId && !window.location.hostname.includes('localhost')) {
+            const scriptFb = document.createElement('script');
+            scriptFb.id = 'fb-pixel-script';
+            scriptFb.innerHTML = `
+                !function(f,b,e,v,n,t,s)
+                {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+                n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+                if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+                n.queue=[];t=b.createElement(e);t.async=!0;
+                t.src=v;s=b.getElementsByTagName(e)[0];
+                s.parentNode.insertBefore(t,s)}(window, document,'script',
+                'https://connect.facebook.net/en_US/fbevents.js');
+                fbq('init', '${site.pixels.facebookPixelId}');
+                fbq('track', 'PageView');
+            `;
+            document.head.appendChild(scriptFb);
+        }
+
+        return () => {
+            // Cleanup on unmount
+            document.title = originalTitle;
+            if (originalDescription) metaDescription?.setAttribute('content', originalDescription);
+            
+            // Note: We don't necessarily remove scripts to avoid re-adding overhead if switching views,
+            // but in a real SPA you might want cleaner management.
+        };
+    }, [config]);
+
     if (isLoading) {
         return (
             <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white">

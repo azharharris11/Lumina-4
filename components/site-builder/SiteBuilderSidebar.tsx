@@ -96,6 +96,35 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = ({
         }
     };
 
+    const [isVerifyingDomain, setIsVerifyingDomain] = useState(false);
+    const [domainVerificationStatus, setDomainVerificationStatus] = useState<'IDLE' | 'SUCCESS' | 'FAILED' | 'ERROR'>('IDLE');
+
+    const verifyDomain = async () => {
+        if (!localSite.customDomain) return;
+        setIsVerifyingDomain(true);
+        setDomainVerificationStatus('IDLE');
+        
+        try {
+            // Check CNAME record via Google DNS API
+            const response = await fetch(`https://dns.google/resolve?name=${localSite.customDomain}&type=CNAME`);
+            const data = await response.json();
+            
+            // Expected target: app.luminaphotocrm.com
+            const target = 'app.luminaphotocrm.com';
+            const hasCorrectCNAME = data.Answer?.some((ans: any) => ans.data.includes(target));
+            
+            if (hasCorrectCNAME) {
+                setDomainVerificationStatus('SUCCESS');
+            } else {
+                setDomainVerificationStatus('FAILED');
+            }
+        } catch (e) {
+            setDomainVerificationStatus('ERROR');
+        } finally {
+            setIsVerifyingDomain(false);
+        }
+    };
+
     if (!isSidebarOpen) return null;
 
     const sections = getActiveSections();
@@ -731,12 +760,31 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = ({
                                 {/* Custom Domain Input */}
                                 <div>
                                     <label className="text-[10px] text-gray-500 uppercase block mb-1 font-bold">Custom Domain (Optional)</label>
-                                    <DebouncedInput 
-                                        value={localSite.customDomain || ''}
-                                        onChange={(val: string) => handleGlobalChange('customDomain', val)}
-                                        className="w-full bg-[#1a1a1a] border border-[#333] rounded p-2 text-sm text-white outline-none"
-                                        placeholder="www.yourdomain.com"
-                                    />
+                                    <div className="flex gap-2">
+                                        <DebouncedInput 
+                                            value={localSite.customDomain || ''}
+                                            onChange={(val: string) => handleGlobalChange('customDomain', val)}
+                                            className="flex-1 bg-[#1a1a1a] border border-[#333] rounded p-2 text-sm text-white outline-none"
+                                            placeholder="www.yourdomain.com"
+                                        />
+                                        <button 
+                                            onClick={verifyDomain}
+                                            disabled={!localSite.customDomain || isVerifyingDomain}
+                                            className="bg-[#333] text-white px-3 rounded text-[10px] font-bold uppercase hover:bg-white hover:text-black transition-colors disabled:opacity-30"
+                                        >
+                                            {isVerifyingDomain ? <Loader2 size={12} className="animate-spin"/> : 'Verify'}
+                                        </button>
+                                    </div>
+                                    
+                                    {domainVerificationStatus === 'SUCCESS' && (
+                                        <p className="text-[10px] text-emerald-400 mt-1 flex items-center gap-1 font-bold"><CheckCircle2 size={10}/> Connection verified!</p>
+                                    )}
+                                    {domainVerificationStatus === 'FAILED' && (
+                                        <p className="text-[10px] text-rose-400 mt-1 flex items-center gap-1 font-bold"><AlertCircle size={10}/> Record not found yet.</p>
+                                    )}
+                                    {domainVerificationStatus === 'ERROR' && (
+                                        <p className="text-[10px] text-gray-500 mt-1">Unable to check DNS at this moment.</p>
+                                    )}
                                 </div>
                                 
                                 {/* Simple Guide */}
@@ -781,6 +829,17 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = ({
                                         value={localSite.seo?.title || ''}
                                         onChange={(val: string) => handleGlobalChange('seo', { ...localSite.seo, title: val })}
                                         className="w-full bg-[#1a1a1a] border border-[#333] rounded p-2 text-sm text-white outline-none"
+                                        placeholder="Studio Name | Professional Photographer"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] text-gray-500 uppercase block mb-1 font-bold">SEO Description</label>
+                                    <DebouncedTextarea 
+                                        value={localSite.seo?.description || ''}
+                                        onChange={(val: string) => handleGlobalChange('seo', { ...localSite.seo, description: val })}
+                                        className="w-full bg-[#1a1a1a] border border-[#333] rounded p-2 text-sm text-white outline-none min-h-[80px]"
+                                        placeholder="Describe your studio for search engines..."
                                     />
                                 </div>
                                 
@@ -788,24 +847,35 @@ const SiteBuilderSidebar: React.FC<SiteBuilderSidebarProps> = ({
                                 <div className="p-3 bg-white rounded border border-[#333]">
                                     <div className="text-[10px] text-gray-500 mb-1">Google Search Preview</div>
                                     <div className="text-[#1a0dab] text-sm font-medium hover:underline cursor-pointer truncate">
-                                        {localSite.seo?.title || localSite.title}
+                                        {localSite.seo?.title || localSite.title || 'Studio Name'}
                                     </div>
                                     <div className="text-[#006621] text-xs truncate">
                                         https://{localSite.subdomain || 'your-site'}.luminaphotocrm.com
                                     </div>
                                     <div className="text-[#545454] text-xs line-clamp-2">
-                                        {localSite.seo?.description || localSite.description}
+                                        {localSite.seo?.description || localSite.description || 'Professional photography services...'}
                                     </div>
                                 </div>
 
-                                <div>
-                                    <label className="text-[10px] text-gray-500 uppercase block mb-1 font-bold">Facebook Pixel ID</label>
-                                    <DebouncedInput 
-                                        value={localSite.pixels?.facebookPixelId || ''}
-                                        onChange={(val: string) => handleGlobalChange('pixels', { ...localSite.pixels, facebookPixelId: val })}
-                                        className="w-full bg-[#1a1a1a] border border-[#333] rounded p-2 text-sm text-white outline-none font-mono"
-                                        placeholder="1234567890"
-                                    />
+                                <div className="grid grid-cols-2 gap-3 pt-2">
+                                    <div>
+                                        <label className="text-[10px] text-gray-500 uppercase block mb-1 font-bold">Facebook Pixel ID</label>
+                                        <DebouncedInput 
+                                            value={localSite.pixels?.facebookPixelId || ''}
+                                            onChange={(val: string) => handleGlobalChange('pixels', { ...localSite.pixels, facebookPixelId: val })}
+                                            className="w-full bg-[#1a1a1a] border border-[#333] rounded p-2 text-sm text-white outline-none font-mono"
+                                            placeholder="Pixel ID"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] text-gray-500 uppercase block mb-1 font-bold">Google Analytics (G-)</label>
+                                        <DebouncedInput 
+                                            value={localSite.pixels?.googleTagId || ''}
+                                            onChange={(val: string) => handleGlobalChange('pixels', { ...localSite.pixels, googleTagId: val })}
+                                            className="w-full bg-[#1a1a1a] border border-[#333] rounded p-2 text-sm text-white outline-none font-mono"
+                                            placeholder="G-XXXXXXX"
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { SiteBuilderViewProps, SitePage, SiteSection, SectionType, SiteTheme, SiteConfig, PublicBookingSubmission } from '../types';
-import { Globe, Smartphone, Monitor, PanelLeftOpen, Undo2, Redo2, Loader2 } from 'lucide-react';
+import { Globe, Smartphone, Monitor, PanelLeftOpen, Undo2, Redo2, Loader2, Copy, Check } from 'lucide-react';
 import SitePreviewFrame from '../components/site-builder/SitePreviewFrame';
 import SiteBuilderSidebar from '../components/site-builder/SiteBuilderSidebar';
 
@@ -59,6 +59,13 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isSaving, setIsSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(publicUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const hasChanges = useMemo(() => {
       return JSON.stringify(localSite) !== JSON.stringify(config.site);
@@ -347,13 +354,22 @@ const SiteBuilderView: React.FC<ExtendedSiteBuilderViewProps> = ({ config, packa
                             {isSaving ? 'Saving...' : 'Save to View Live'}
                         </span>
                     ) : (
-                        <a 
-                            href={publicUrl} 
-                            target="_blank"
-                            className="flex items-center gap-2 text-xs font-bold transition-colors text-emerald-400 hover:text-emerald-300"
-                        >
-                            <Globe size={14}/> View Live Site
-                        </a>
+                        <div className="flex items-center gap-4">
+                            <a 
+                                href={publicUrl} 
+                                target="_blank"
+                                className="flex items-center gap-2 text-xs font-bold transition-colors text-emerald-400 hover:text-emerald-300"
+                            >
+                                <Globe size={14}/> View Live Site
+                            </a>
+                            <button 
+                                onClick={handleCopyLink}
+                                className="flex items-center gap-2 text-xs font-bold transition-colors text-lumina-muted hover:text-white"
+                            >
+                                {copied ? <Check size={14} className="text-emerald-400"/> : <Copy size={14}/>}
+                                {copied ? 'Copied!' : 'Copy Link'}
+                            </button>
+                        </div>
                     )}
                 </div>
                 {!isSidebarOpen && !isMobile && (

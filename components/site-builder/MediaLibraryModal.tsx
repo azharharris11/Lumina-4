@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Upload, Image as ImageIcon, Trash2, Check, Loader2, Search } from 'lucide-react';
-import { uploadFile } from '../../utils/storageUtils';
+import { uploadFile, compressImage } from '../../utils/storageUtils';
 import { ref, listAll, getDownloadURL, deleteObject } from 'firebase/storage';
 import { storage } from '../../firebase';
 
@@ -52,11 +52,24 @@ const MediaLibraryModal: React.FC<MediaLibraryModalProps> = ({ isOpen, onClose, 
         if (e.target.files && e.target.files[0]) {
             setIsUploading(true);
             try {
-                const file = e.target.files[0];
-                const url = await uploadFile(file, 'site-assets');
+                const originalFile = e.target.files[0];
+                
+                // Compress image before upload (Client-side optimization)
+                // Max width 1920px, 80% quality JPEG
+                let fileToUpload: File | Blob = originalFile;
+                if (originalFile.type.startsWith('image/')) {
+                    try {
+                        fileToUpload = await compressImage(originalFile);
+                    } catch (compressionError) {
+                        console.warn("Image compression failed, uploading original.", compressionError);
+                    }
+                }
+
+                const url = await uploadFile(fileToUpload, 'site-assets', originalFile.name);
                 // Optimistic update
-                setImages(prev => [{ name: file.name, url, date: Date.now() }, ...prev]);
+                setImages(prev => [{ name: originalFile.name, url, date: Date.now() }, ...prev]);
             } catch (err) {
+                console.error("Upload error:", err);
                 alert("Upload failed.");
             } finally {
                 setIsUploading(false);

@@ -536,29 +536,44 @@ export const claimSubdomain = onCall({ cors: true, invoker: "public" }, async (r
   // We use a dedicated collection 'subdomain_registry' where the document ID IS the subdomain.
   // This guarantees uniqueness at the database level.
   const registryRef = db.collection("subdomain_registry").doc(cleanSubdomain);
+  const studioRef = db.collection("studios").doc(userId);
 
   try {
     await db.runTransaction(async (transaction) => {
+      // 1. Check if new subdomain is taken
       const docSnapshot = await transaction.get(registryRef);
 
       if (docSnapshot.exists) {
         const data = docSnapshot.data();
         // If it exists, check if it belongs to the current user
         if (data?.ownerId === userId) {
-          return; // Already owned by requester, success
+          return; // Already owned by requester, success (idempotent)
         } else {
           throw new HttpsError("already-exists", `Subdomain '${cleanSubdomain}' is already taken.`);
         }
       }
 
-      // If available, reserve it
+      // 2. Check for OLD subdomain to release
+      const studioSnap = await transaction.get(studioRef);
+      const oldSubdomain = studioSnap.data()?.site?.subdomain;
+
+      if (oldSubdomain && oldSubdomain !== cleanSubdomain) {
+        // Verify we own the old one before deleting (safety check)
+        const oldRegistryRef = db.collection("subdomain_registry").doc(oldSubdomain);
+        const oldRegistrySnap = await transaction.get(oldRegistryRef);
+
+        if (oldRegistrySnap.exists && oldRegistrySnap.data()?.ownerId === userId) {
+          transaction.delete(oldRegistryRef);
+        }
+      }
+
+      // 3. Reserve new subdomain
       transaction.set(registryRef, {
         ownerId: userId,
         claimedAt: new Date().toISOString(),
       });
 
-      // Also update the user's studio config
-      const studioRef = db.collection("studios").doc(userId);
+      // 4. Update User Studio Config
       transaction.set(studioRef, {site: {subdomain: cleanSubdomain}}, {merge: true});
     });
 
